@@ -1,3 +1,4 @@
+import { copyTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
@@ -9,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { chromium, expect } from '@playwright/test';
 
 const root = await mkdtemp(join(tmpdir(), 'margin-connect-check-'));
-const extension = resolve('dist');
+const extension = join(root,'extension');
 const issuer = 'https://auth.openai.com';
 const clientId = 'oaiapp_fixture';
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -57,12 +58,13 @@ const server = createServer(async (req, res) => {
         assert.ok(!('background' in payload) && !('max_output_tokens' in payload));
         assert.ok(!payload.tools && !payload.input.some(item => item.role === 'system'));
         assert.ok(payload.input.some(item => item.type === 'additional_tools' && item.tools.some(tool => tool.name === 'ask_reader')));
+        if (JSON.stringify(payload.input.at(-1)).includes('Check rate limit')) return res.writeHead(429).end();
         calls++;
         const finishStream = new Promise(resolve => {
           release = resolve;
           res.once('close', () => { if (!res.writableEnded) streamClosed = true; resolve(); });
         });
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.writeHead(200, calls === 1 ? {} : { 'Content-Type': 'text/event-stream' });
         const event = (type, values) => res.write('data: ' + JSON.stringify({ type, ...values }) + '\n\n');
         const item = { type: 'message', id: 'msg_read', role: 'assistant', content: [] };
         event('response.created', { response: { id: 'r_read' } });
@@ -101,6 +103,7 @@ try {
   const profile = join(root, 'browser');
   const launch = () => chromium.launchPersistentContext(profile, { executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     headless: true, ignoreDefaultArgs: ['--disable-extensions'], args: ['--no-proxy-server','--host-resolver-rules=MAP auth.openai.com 127.0.0.1:' + consentServer.address().port, '--ignore-certificate-errors-spki-list=' + spki, '--load-extension=' + extension, '--disable-extensions-except=' + extension] });
+  await copyTestExtension(extension);
   context = await launch();
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   // Node URL treats the extension scheme as opaque.
@@ -178,6 +181,8 @@ try {
   const control = await context.newPage();
   await control.goto(extensionOrigin + 'connect.html');
   const sessionId = (await detail()).id;
+  await panel.evaluate(sessionId => PiBrowser.request('send', { sessionId, text: 'Check rate limit' }), sessionId);
+  await expect.poll(async () => (await detail()).error).toMatch(/429.*usage limits/);
   await panel.evaluate(sessionId => PiBrowser.request('send', { sessionId, text: 'Keep my question in this follow-up.' }), sessionId);
   await expect.poll(() => calls).toBe(2);
   await control.getByRole('button', { name: 'Disconnect account' }).click();

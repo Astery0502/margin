@@ -11,7 +11,7 @@ import (
 )
 
 var storeID string // Set only for an extension with a published Chrome Web Store listing.
-func install(support, executable string, browsers []string) error {
+func install(support, executable, hostName string, browsers []string) error {
 	allowed := strings.Fields(origins)
 	if len(allowed) == 0 {
 		return errors.New("Missing extension identity.")
@@ -46,7 +46,7 @@ func install(support, executable string, browsers []string) error {
 func setupWindow(support string) {
 	binary, err := os.Executable()
 	if err == nil {
-		err = install(support, binary, []string{filepath.Join(support, "Google", "Chrome"), filepath.Join(support, "Microsoft Edge")})
+		err = install(support, binary, "dev.margin.connect", []string{filepath.Join(support, "Google", "Chrome"), filepath.Join(support, "Microsoft Edge")})
 	}
 	msg := "Margin Connect is ready. Return to Margin in your browser to continue."
 	if err != nil {

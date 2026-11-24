@@ -6,7 +6,7 @@ On macOS, write your first question and choose **Connect ChatGPT to send**. Down
 
 ## Install a GitHub build
 
-The initial distribution channel is GitHub Releases. The macOS release asset is `Margin-Chromium-macOS.zip`. Extract it, open the extensions page in Chrome or Edge, enable **Developer mode**, choose **Load unpacked**, and select the extracted `dist` folder. Keep that folder in place. The connection page offers Margin Connect from the same package. The initial build uses an ad hoc signature. macOS may ask you to confirm the first launch of the downloaded app.
+Download the preview from [GitHub Releases](https://github.com/Astery0502/margin/releases). The macOS release asset is `Margin-Chromium-macOS.zip`. Extract it, open the extensions page in Chrome or Edge, enable **Developer mode**, choose **Load unpacked**, and select the extracted `dist` folder. Keep that folder in place. The connection page offers Margin Connect from the same package. The initial build uses an ad hoc signature. Gatekeeper may block the first launch of the downloaded app.
 
 ## Build and load
 
@@ -35,6 +35,6 @@ Chrome and Edge start the helper on demand for account access and model requests
 
 `npm run check` builds the extension and runs the floating-window, PDF, discussion, local-file and dictation checks. The full suite uses Microsoft Edge on macOS, isolated browser profiles and a synthesized test voice. The discussion check substitutes the account and model transport in a temporary copy of the extension. It exercises task execution, streaming, source cleanup and the native side panel without a live subscription.
 
-After building, `npm run check:connect` uses a separate temporary Edge profile, signed fixture identity tokens and a local streaming server to exercise the connection UI, OAuth, refresh, revocation and SDK transport. Account approval and inference with an actual subscription require a separate live check.
+After building, `npm run check:connect` uses a separate temporary Edge profile, signed fixture identity tokens and a local streaming server to exercise the connection UI, OAuth, refresh, revocation and SDK transport. A separate live check on Apple Silicon verified ChatGPT authorization, streamed output in a Full PDF discussion, stopping from the side panel and locating the selected passage.
 
 The PDF fixture comes from the [PDF.js sample collection](https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf).

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,13 +17,19 @@ import (
 )
 
 var origins string // Filled from the extension manifest at build time.
-const hostName = "dev.margin.connect"
 
 type command struct {
 	Op, Body, Account string
 	Generation        int
 }
 type message = map[string]any
+
+type providerHTTPError struct {
+	status  int
+	message string
+}
+
+func (e *providerHTTPError) Error() string { return e.message }
 
 func frame(value any) error {
 	data, err := json.Marshal(value)
@@ -115,10 +122,10 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 		if err != nil {
 			return err
 		}
-		return errors.New("OpenAI declined this session. Try again to refresh it, or reconnect in settings.")
+		return &providerHTTPError{res.StatusCode, "OpenAI declined this session. Try again to refresh it, or reconnect in settings."}
 	}
 	if res.StatusCode != 200 {
-		return fmt.Errorf("OpenAI returned HTTP %d. Check the account's model access and usage limits.", res.StatusCode)
+		return &providerHTTPError{res.StatusCode, fmt.Sprintf("OpenAI returned HTTP %d. Check the account's model access and usage limits.", res.StatusCode)}
 	}
 	if op == "models" {
 		var list struct {
@@ -140,8 +147,12 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 		}
 		return send(message{"connected": true, "modelIds": ids, "names": names})
 	}
-	if !strings.HasPrefix(res.Header.Get("Content-Type"), "text/event-stream") {
-		return errors.New("OpenAI did not return a streaming response.")
+	// Subscription responses can omit Content-Type. The SDK validates the SSE terminal event.
+	if header := res.Header.Get("Content-Type"); header != "" {
+		media, _, err := mime.ParseMediaType(header)
+		if err != nil || media != "text/event-stream" {
+			return errors.New("OpenAI did not return a streaming response.")
+		}
 	}
 	if err = send(message{"start": true}); err != nil {
 		return err
@@ -163,6 +174,7 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 	}
 	return send(message{"done": true})
 }
+
 func (p provider) operate(ctx context.Context, cmd command, send func(any) error) error {
 	switch cmd.Op {
 	case "status":
@@ -231,6 +243,11 @@ func runNative(p provider) {
 	// Closing the extension port must stop the callback listener or upstream model request.
 	go func() { var b [1]byte; os.Stdin.Read(b[:]); cancel() }()
 	if err = p.operate(ctx, cmd, frame); err != nil {
-		frame(message{"error": err.Error()})
+		reply := message{"error": err.Error()}
+		var upstream *providerHTTPError
+		if errors.As(err, &upstream) {
+			reply["status"] = upstream.status
+		}
+		frame(reply)
 	}
 }

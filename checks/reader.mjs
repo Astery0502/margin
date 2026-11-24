@@ -1,7 +1,9 @@
+import { copyTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { chromium, expect } from '@playwright/test';
 
 const sample = await readFile(new URL('./fixtures/sample.pdf', import.meta.url));
@@ -18,9 +20,11 @@ const server = createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:' + server.address().port;
+const temp = await mkdtemp(join(tmpdir(), 'margin-reader-'));
 let context;
 try {
-  const extension = resolve('dist');
+  const extension = join(temp, 'extension');
+  await copyTestExtension(extension);
   context = await chromium.launchPersistentContext('', {
     executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     headless: true, ignoreDefaultArgs: ['--disable-extensions'],
@@ -78,4 +82,5 @@ try {
 } finally {
   await context?.close();
   await new Promise(resolve => server.close(resolve));
+  await rm(temp, { recursive: true, force: true });
 }

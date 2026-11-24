@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 	binary, _ := os.Executable()
 	if len(os.Args) == 3 && os.Args[1] == "--install-fixture" {
 		root := os.Args[2]
-		if err := install(root, binary, []string{filepath.Join(root, "browser")}); err != nil {
+		if err := install(root, binary, "dev.margin.test_connect", []string{filepath.Join(root, "browser")}); err != nil {
 			panic(err)
 		}
 		return

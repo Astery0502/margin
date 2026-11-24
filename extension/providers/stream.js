@@ -22,7 +22,13 @@ async function nativeFetch(generation, url, init) {
       close();
     }
     port1.onmessage = ({ data }) => {
-      if (data.error) return fail(new Error(data.error));
+      if (data.error) {
+        if (controller) return fail(new Error(data.error));
+        // A rejected fetch is reduced to "Connection error" by the SDK.
+        resolve(Response.json({ error: { message: data.error } }, { status: data.status || 502 }));
+        close();
+        return;
+      }
       if (data.start) {
         const body = new ReadableStream({
           start(streamController) { controller = streamController; },

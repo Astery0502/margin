@@ -1,13 +1,15 @@
+import { copyTestExtension } from './fixtures/native-extension.mjs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { chromium, expect } from '@playwright/test';
 
 const temp = await mkdtemp(join(tmpdir(), 'margin-local-'));
-const extension = resolve('dist');
+const extension = join(temp,'extension');
 let context;
 try {
+  await copyTestExtension(extension);
   context = await chromium.launchPersistentContext('', { headless: true,
     executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     ignoreDefaultArgs: ['--disable-extensions'], args: ['--load-extension=' + extension, '--disable-extensions-except=' + extension] });

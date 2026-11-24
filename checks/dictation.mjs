@@ -1,9 +1,10 @@
+import { copyTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { cp, mkdtemp, rename, rm } from 'node:fs/promises';
+import { mkdtemp, rename, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
 
 const temp = await mkdtemp(join(tmpdir(), 'margin-speech-'));
@@ -13,7 +14,7 @@ const model = join(extension, 'dictation/models/Xenova/whisper-tiny/onnx/encoder
 const server = createServer((_req, res) => res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Reading</title><p>Discuss this passage in your own words.</p>'));
 let browser;
 try {
-  await cp(resolve('dist'), extension, { recursive: true });
+  await copyTestExtension(extension);
   await rename(model, model + '.unavailable');
   execFileSync('say', ['-v', 'Samantha', '-o', join(temp, 'speech.aiff'), 'This is a reading test. The book is on the table.']);
   execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', '-c', '1', join(temp, 'speech.aiff'), audio]);

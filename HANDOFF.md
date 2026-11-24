@@ -72,4 +72,4 @@ Margin 让用户在网页或 PDF 原文旁选段提问、持续讨论，并随�
 
 本仓库已可独立构建。在隔离 Edge 中已验证网页与本地文件、PDF 定位、截图与引用、数学公式、离线听写和页面清理。通过测试专用的授权与模型传输替身，已验证真实 Agent 执行、文档共享上下文、原生侧栏接续与停止、委派和工具操作。运行完整回归用 `npm run check`。[构建与使用说明](README.md) · [阅读器迁移记录](docs/specs/001-standalone-reader/impl.md) · [讨论执行记录](docs/specs/002-discussion-runtime/impl.md) · [听写与集成验收记录](docs/specs/003-dictation-and-integration/impl.md)
 
-下一项产品验收是用真实 ChatGPT 订阅完成第四节的 PDF 讨论、刷新和退出。先用 `npm run build:mac` 构建扩展和 Margin Connect，再按连接页操作。首版只通过 GitHub Releases 分发。使用默认本地构建，在干净的 macOS 浏览器配置中从发布附件试装。Developer ID 签名、Apple 公证和扩展商店上架均不列入首版验收。实现与隔离验收记录见[订阅连接](docs/specs/004-margin-connect/impl.md)。[注册与登录](https://developers.openai.com/siwc/token-sharing-open-source/sign-in) · [账户与凭据](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
+真实 ChatGPT 订阅已经在 macOS 的 Edge 中完成首次授权。用公开样例 PDF 选段启动 `Full` 讨论后，已收到回答文字，在原生侧栏中停止正在生成的回答，并定位回第一页原段。下一项账户验收是在真实令牌到期后观察自然刷新，并由账户使用者结束会话时验证撤销。自动化已通过受控账户覆盖这两项。首版通过 GitHub Releases 分发，使用本地构建的 macOS 组件。开发签名包可能被 Gatekeeper 拦截，系统策略下的首次打开体验需按机器实测。[预览发布](https://github.com/Astery0502/margin/releases) · [订阅连接实现记录](docs/specs/004-margin-connect/impl.md)
