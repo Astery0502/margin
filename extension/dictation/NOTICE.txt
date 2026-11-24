@@ -1,0 +1,6 @@
+Margin includes the quantized ONNX conversion of OpenAI Whisper Tiny, distributed
+by Xenova under the Apache License 2.0. The model and its tokenizer run locally.
+Upstream model: https://huggingface.co/openai/whisper-tiny
+ONNX conversion: https://huggingface.co/Xenova/whisper-tiny
+Revision: 5332fcc35e32a33b86612b9a57a89be7906102b1
+The Apache License 2.0 is included in LICENSE.transformers at the extension root.

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width">
+  <title>Margin settings</title>
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body><main>
+<h1>Margin settings</h1>
+<section><h2>OpenAI subscription</h2>
+<p id="account">Use your ChatGPT plan to discuss passages.</p><a href="connect.html">Manage ChatGPT connection</a>
+</section>
+<section><h2>Agents</h2>
+<form id="agent-form">
+<label>Default agent<select id="profile"></select></label>
+<button type="button" id="new-agent">Add agent</button>
+<label>Name<input id="name" required></label>
+<label>Instructions<textarea id="instructions" rows="4"></textarea></label>
+<label>Preferred model<select id="model"></select></label>
+<label>Reasoning<select id="thinking"></select></label><label>Speed<select id="tier"><option value="default">Provider default</option><option value="fast">Fast</option></select></label>
+<fieldset><legend>Tools</legend><label><input type="checkbox" id="ask"> Ask the reader</label><label><input type="checkbox" id="notes"> Read and write notes for this page</label><label><input type="checkbox" id="delegate"> Delegate reading tasks on this page</label></fieldset>
+<button type="submit">Save agent settings</button><output id="status" role="status"></output>
+</form></section>
+<section><h2>Local files</h2><p id="file-access"></p>
+<button id="details">Open extension details</button></section>
+</main></body></html>

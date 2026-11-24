@@ -1,0 +1,234 @@
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createServer } from 'node:http';
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { chromium, expect } from '@playwright/test';
+
+const root = await mkdtemp(join(tmpdir(), 'margin-discussions-'));
+const extension = join(root, 'extension');
+const pdf = await readFile(new URL('./fixtures/sample.pdf', import.meta.url));
+const server = createServer((req, res) => {
+  if (req.url === '/sample.pdf') res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length }).end(pdf);
+  else res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Example article</title><p>First passage on this page.</p><p>Second passage on this page.</p>');
+});
+let context, attached;
+try {
+  await cp('dist', extension, { recursive: true });
+  await build({ entryPoints: ['extension/agents/worker.js', 'extension/background.js'], outbase: 'extension', outdir: extension, bundle: true, platform: 'browser', format: 'esm',
+    plugins: [{ name: 'controlled-replies', setup(build) {
+      build.onResolve({ filter: /providers\/stream\.js$/ }, () => ({ path: resolve('checks/fixtures/stream.js') }));
+      build.onResolve({ filter: /(?:^\.\/|providers\/)grant\.js$/ }, () => ({ path: 'grant', namespace: 'fixture' }));
+      build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "export async function accountGeneration() { return 1; } export async function account() { return { modelIds: ['gpt-6.1-sol'], accessToken: 'controlled' }; }" }));
+    } }] });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = 'http://127.0.0.1:' + server.address().port;
+  context = await chromium.launchPersistentContext(join(root, 'profile'), { headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    ignoreDefaultArgs: ['--disable-extensions'], args: ['--use-fake-device-for-media-stream', '--remote-debugging-port=0', '--disable-extensions-except=' + extension, '--load-extension=' + extension] });
+  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  const page = await context.newPage();
+  const errors = [];
+  context.on('weberror', event => errors.push(event.error().message));
+  const settings = await context.newPage();
+  await settings.goto(new URL('options.html', worker.url()).href);
+  await settings.getByLabel('Read and write notes for this page').check();
+  await settings.getByLabel('Delegate reading tasks on this page').check();
+  await settings.getByText('Save agent settings').click();
+  await expect(settings.locator('#status')).toHaveText('Agent settings saved.');
+  const cdp = await context.newCDPSession(page);
+  let versionId;
+  cdp.on('ServiceWorker.workerVersionUpdated', ({ versions }) => {
+    const match = versions.find(v => v.scriptURL === worker.url() && v.runningStatus === 'running');
+    if (match) versionId = match.versionId;
+  });
+  await cdp.send('ServiceWorker.enable');
+  await page.goto(origin);
+  let panel = await context.newPage();
+  await panel.goto(new URL('sidepanel.html', worker.url()).href);
+  const rpc = (action, values = {}) => panel.evaluate(([name, data]) => PiBrowser.request(name, data), [action, values]);
+  const listed = async () => (await rpc('browse', {})).sessions;
+  async function compose(index, mode, question) {
+    await page.bringToFront();
+    await page.locator('body > p').nth(index).evaluate(p => {
+      const range = document.createRange(); range.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(range);
+      p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    await page.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: mode, exact: true }).click();
+    const draft = page.getByRole('textbox', { name: 'Discussion draft' });
+    await draft.fill(question);
+    await draft.press('Enter');
+  }
+
+  await page.bringToFront();
+  await page.locator('body > p').first().evaluate(p => {
+    const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r);
+    p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: 'Quick' }).click();
+  await page.getByRole('button', { name: 'Add image' }).click();
+  await expect(page.getByRole('dialog', { name: 'Select image region' })).toBeVisible();
+  await page.mouse.move(15, 15);
+  await page.mouse.down();
+  await page.mouse.move(220, 65, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByAltText('Attached image 1')).toBeVisible();
+  const quickDraft = page.getByRole('textbox', { name: 'Discussion draft' });
+  await quickDraft.fill('Explain this figure');
+  await quickDraft.press('Enter');
+  await expect.poll(async () => (await listed())[0]?.status).toBe('completed');
+  const photoDetail = await rpc('detail', { sessionId: (await listed())[0].id });
+  assert.match(JSON.stringify(photoDetail.messages.at(-1)?.content), /equation/);
+  await expect(page.locator('.katex')).toBeVisible();
+  const answer = page.getByText('this equation', { exact: true });
+  const box = await answer.boundingBox();
+  await page.mouse.move(box.x, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width, box.y + box.height / 2, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
+  await page.getByRole('button', { name: 'Add to conversation' }).click();
+  await expect(quickDraft).toHaveValue(/Quoted from Pi:[\s\S]*equation/);
+  const [quick] = await listed();
+  const quickExport = await rpc('exportPage', { sourceId: page.url() });
+  assert.equal(quickExport.snapshots.length, 0);
+  assert.ok(quickExport.messages.some(entry => entry.message.content?.some(block => block.type === 'image')));
+  await rpc('deleteDiscussions', { sessionIds: [quick.id] });
+  await expect(quickDraft).toHaveCount(0);
+
+  await compose(0, 'Full', 'Give a long response');
+  await expect.poll(async () => (await listed())[0]?.status, { timeout: 10000 }).toBe('running');
+  const first = (await listed())[0].id;
+  await expect.poll(async () => JSON.stringify((await rpc('detail', { sessionId: first })).messages)).toContain('Streaming');
+  await panel.close();
+  const input = page.getByRole('textbox', { name: 'Discussion draft' });
+  await input.fill('Please queue the next question');
+  await input.press('Tab');
+  // Wait for acceptance before editing the next unsent draft.
+  await expect(input).toHaveValue('');
+  await input.fill('Keep this handoff draft');
+  const opening = context.waitForEvent('page', { timeout: 2000 }).catch(() => null);
+  await page.getByRole('button', { name: 'Open in side panel' }).click();
+  panel = await opening;
+  if (!panel) {
+    const port = (await readFile(join(root, 'profile/DevToolsActivePort'), 'utf8')).split('\n')[0];
+    attached = await chromium.connectOverCDP('http://127.0.0.1:' + port);
+    panel = attached.contexts().flatMap(ctx => ctx.pages()).find(p => p.url().endsWith('/sidepanel.html'));
+  }
+  assert.ok(panel, 'The native side panel opened');
+  await expect(panel.getByRole('textbox', { name: 'Discussion draft' })).toHaveValue('Keep this handoff draft');
+  await expect.poll(async () => (await rpc('detail', { sessionId: first })).queuedMessages?.followUp).toEqual(['Please queue the next question']);
+  await expect.poll(() => versionId).toBeTruthy();
+  await cdp.send('ServiceWorker.stopWorker', { versionId });
+  await expect.poll(async () => (await rpc('get', { sessionId: first })).status).toBe('running');
+  await expect(panel.getByRole('button', { name: 'Stop task' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Stop task' }).click();
+  await expect.poll(async () => (await listed())[0].status).toBe('cancelled');
+  await panel.getByRole('button', { name: 'Locate passage' }).first().click();
+  await expect(page.locator('body > p').first()).toBeInViewport();
+
+  await context.grantPermissions(['microphone']);
+  await page.bringToFront();
+  await page.locator('[data-pi-session-id]').getByRole('button', { name: 'Full', exact: true }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
+  assert.equal((await panel.evaluate(id => PiBrowser.voice('status', id), first)).state, 'idle');
+  await page.getByRole('button', { name: 'Open in side panel' }).click();
+  await expect(panel.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Cancel dictation' }).click();
+  await expect(panel.getByRole('button', { name: 'Record', exact: true })).toBeEnabled();
+
+  await compose(1, 'Full', 'Explain the next paragraph');
+  await expect.poll(async () => (await listed()).filter(item => item.status === 'completed').length).toBe(1);
+  const second = (await listed()).find(item => item.id !== first);
+  assert.equal(second.sessionId, (await rpc('get', { sessionId: first })).sessionId);
+  const secondDetail = await rpc('detail', { sessionId: second.id });
+  assert.match(JSON.stringify(secondDetail.messages), /Answer with 1 document snapshot/);
+  assert.doesNotMatch(JSON.stringify(secondDetail.messages), /Give a long response/);
+  await rpc('model', { sessionId: second.id, thinking: 'low', tier: 'default' });
+  assert.equal((await rpc('get', { sessionId: first })).thinking, 'low');
+  await rpc('send', { sessionId: second.id, text: 'Take a brief pause' });
+  await rpc('send', { sessionId: second.id, text: 'Guide the next model call', mode: 'steer' });
+  await rpc('send', { sessionId: second.id, text: 'Queue this follow-up', mode: 'followUp' });
+  await expect.poll(async () => (await rpc('get', { sessionId: second.id })).status, { timeout: 10000 }).toBe('completed');
+  const turns = (await rpc('detail', { sessionId: second.id })).messages.filter(m => m.role === 'user').map(m => m.presentation.text);
+  assert.deepEqual(turns.slice(-3), ['Take a brief pause', 'Guide the next model call', 'Queue this follow-up']);
+  await rpc('send', { sessionId: second.id, text: 'Please ask for clarification' });
+  await expect.poll(async () => (await rpc('detail', { sessionId: second.id })).interactionRequests?.length).toBe(1);
+  const [request] = (await rpc('detail', { sessionId: second.id })).interactionRequests;
+  await rpc('interaction', { sessionId: second.id, requestId: request.id, answer: { value: 'The second one' } });
+  await expect.poll(async () => (await rpc('get', { sessionId: second.id })).status).toBe('completed');
+  await rpc('send', { sessionId: second.id, text: 'Please save a note' });
+  await expect.poll(async () => (await rpc('storage', { sourceId: page.url() })).workingFiles).toBe(1);
+  await expect.poll(async () => (await rpc('get', { sessionId: second.id })).status).toBe('completed');
+  await rpc('clearPageFiles', { sourceId: page.url() });
+  assert.equal((await rpc('storage', { sourceId: page.url() })).workingFiles, 0);
+  await rpc('archivePage', { sourceId: page.url(), archived: true });
+  assert.equal((await listed()).length, 0);
+  await rpc('archivePage', { sourceId: page.url(), archived: false });
+  assert.equal((await rpc('browse', { query: 'Example article' })).total, 2);
+  const exported = await rpc('exportPage', { sourceId: page.url() });
+  assert.equal(exported.snapshots.length, 1);
+  await rpc('send', { sessionId: second.id, text: 'Delegate a reading task' });
+  await expect.poll(async () => (await listed()).filter(item => item.parentId).length).toBe(1);
+  await expect.poll(async () => (await listed()).filter(item => item.status === 'running').length).toBe(0);
+  const branch = await rpc('fork', { sessionId: second.id });
+  assert.notEqual(branch.sessionId, second.sessionId);
+  assert.ok((await rpc('detail', { sessionId: branch.id })).messages.length);
+  await rpc('deleteDiscussions', { sessionIds: [branch.id, (await listed()).find(item => item.parentId).id] });
+  await panel.getByRole('button', { name: 'List discussions' }).click();
+  await panel.getByRole('button', { name: 'All pages' }).click();
+  await panel.getByRole('button', { name: 'Manage page: Example article' }).click();
+  const downloading = panel.waitForEvent('download');
+  await panel.getByRole('button', { name: 'Export page discussions' }).click();
+  const download = await downloading;
+  const exportedFile = join(root, 'discussions.json');
+  await download.saveAs(exportedFile);
+  await panel.keyboard.press('Escape');
+  const twin = await context.newPage();
+  await twin.goto(page.url());
+  await page.goto(page.url() + '#passage');
+  await page.reload();
+  await expect.poll(async () => (await listed()).length).toBe(2);
+  await page.close();
+  await expect.poll(async () => (await listed()).length).toBe(0);
+  assert.equal(JSON.parse(await readFile(exportedFile, 'utf8')).discussions.length, 2);
+  await twin.close();
+  // Use the same controlled runtime through the PDF reader and native side panel.
+  const native = await context.newPage();
+  await native.goto(origin + '/sample.pdf');
+  const openingPdf = context.waitForEvent('page');
+  await native.getByRole('button', { name: 'Open PDF in Margin' }).click();
+  const reader = await openingPdf;
+  const line = reader.locator('.page[data-page-number="1"] .textLayer span').filter({ hasText: /.{20}/ }).first();
+  await line.evaluate(span => {
+    const r = document.createRange(); r.selectNodeContents(span); getSelection().removeAllRanges(); getSelection().addRange(r);
+    span.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await reader.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: 'Full' }).click();
+  const pdfDraft = reader.getByRole('textbox', { name: 'Discussion draft' });
+  await pdfDraft.fill('A long response about the PDF');
+  await pdfDraft.press('Enter');
+  await expect.poll(async () => (await listed())[0]?.status).toBe('running');
+  const pdfId = (await listed())[0].id;
+  await expect.poll(async () => JSON.stringify((await rpc('detail', { sessionId: pdfId })).messages)).toContain('Streaming');
+  await reader.getByRole('button', { name: 'Open in side panel' }).click();
+  await expect(reader.locator('#discussion')).toBeHidden();
+  await panel.getByRole('button', { name: 'Stop task' }).click();
+  await expect.poll(async () => (await rpc('get', { sessionId: pdfId })).status).toBe('cancelled');
+  await reader.locator('#zoom').selectOption('1.5');
+  await reader.getByRole('button', { name: 'Rotate', exact: true }).click();
+  await reader.locator('#page').fill('8');
+  await reader.locator('#page').press('Tab');
+  await panel.getByRole('button', { name: 'Locate passage' }).first().click();
+  await expect(reader.locator('#page')).toHaveValue('1');
+  await native.close();
+  await rpc('send', { sessionId: pdfId, text: 'A long response to interrupt' });
+  await reader.close();
+  await expect.poll(async () => (await listed()).length).toBe(0);
+  assert.deepEqual(errors, []);
+  console.log('Controlled Agent streaming, cross-view stop, shared Full history, tools, page data and cleanup passed.');
+} finally {
+  await attached?.close();
+  await context?.close();
+  if (server.listening) await new Promise(resolve => server.close(resolve));
+  await rm(root, { recursive: true, force: true });
+}

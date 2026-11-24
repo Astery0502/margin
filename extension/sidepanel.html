@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Margin</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <script src="shared/marked.umd.js" defer></script>
+  <script src="shared/purify.min.js" defer></script>
+  <script src="shared/katex.min.js" defer></script>
+  <script src="shared/markdown-math.js" defer></script>
+  <script src="shared/messages.js" defer></script>
+  <script src="shared/extension-ui.js" defer></script>
+  <script src="client.js" defer></script>
+  <script src="brand.js" defer></script>
+  <script src="conversation.js" defer></script>
+  <script src="sidepanel.js" type="module"></script>
+</head>
+<body>
+  <header class="panel-heading">
+    <h1 id="panel-title">Discussions</h1>
+    <button id="list-toggle" type="button" class="icon-button" aria-label="List discussions" title="List discussions" aria-expanded="false" aria-controls="directory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1"/></svg><span id="related-dot" hidden aria-hidden="true"></span></button>
+    <button id="settings" type="button" class="icon-button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></svg>
+    </button>
+  </header>
+  <section id="directory" aria-label="Discussion list" hidden>
+    <nav class="scopes" aria-label="Discussion scope">
+      <button type="button" data-scope="page" aria-pressed="true">This page</button>
+      <button type="button" data-scope="all" aria-pressed="false">All pages</button>
+    </nav>
+    <div class="filters"><input id="discussion-filter" type="search" aria-label="Find discussions" placeholder="Find discussions"><label><input id="show-archived" type="checkbox"> Show archived</label></div>
+    <p id="current-page" class="current-page"></p>
+    <div id="list-actions" class="list-actions">
+      <label><input id="select-shown" type="checkbox"> Select loaded</label>
+      <button id="delete-selected" type="button" disabled>Delete selected</button>
+      <button id="delete-matching" type="button" disabled>Delete all</button>
+    </div>
+    <div id="discussion-list"></div>
+    <nav class="pagination" aria-label="Discussion pages"><button id="previous-discussions" type="button">Previous</button><span id="discussion-count"></span><button id="next-discussions" type="button">Next</button></nav>
+  </section>
+  <section id="page-menu" class="page-menu" popover aria-label="Page actions">
+    <h2 id="managed-page-title"></h2>
+    <p id="page-usage" role="status">Loading page usage…</p>
+    <dl id="page-storage" hidden>
+      <div><dt>History</dt><dd id="page-history"></dd></div>
+      <div><dt>Saved text</dt><dd id="page-text"></dd></div>
+      <div><dt>Working files</dt><dd id="page-files"></dd></div>
+    </dl>
+    <div class="page-menu-actions">
+      <button type="button" data-page-action="clearPageFiles" aria-label="Clear page files" data-tooltip="Clear page files; keep discussions" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="m10 11 6 6m0-6-6 6"/></svg><span>Clear</span></button>
+      <button type="button" data-page-action="archivePage" aria-label="Archive page discussions" data-tooltip="Archive discussions; keep all data" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8v12h14V8M3 4h18v4H3zM9 12h6"/></svg><span>Archive</span></button>
+      <button type="button" data-page-action="exportPage" aria-label="Export page discussions" data-tooltip="Export discussions and references as JSON" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg><span>Export</span></button>
+      <button type="button" data-page-action="deletePage" class="destructive" aria-label="Delete page data" data-tooltip="Delete discussions and working files" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>Delete</span></button>
+    </div>
+  </section>
+  <main>
+    <p id="other-page" hidden>This discussion belongs to another page.</p>
+    <div id="conversation" hidden></div>
+    <section id="empty-state" class="empty-state">
+      <span id="empty-mark" class="empty-mark" aria-hidden="true"></span>
+      <h2>Think beside the text.</h2>
+      <p>Select a passage on a web page and choose <strong>Quick</strong> or <strong>Full</strong>. Your conversation stays beside its source.</p>
+      <button id="browse" type="button">Browse discussions</button>
+      <button id="empty-settings" type="button" class="text-button">Settings</button>
+      <p class="brand-credit">Margin · Powered by Pi</p>
+    </section>
+  </main>
+  <footer id="feedback" role="status" aria-live="polite"></footer>
+</body>
+</html>

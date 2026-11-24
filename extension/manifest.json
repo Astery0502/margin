@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "130",
+  "name": "Margin",
+  "version": "0.1.0",
+  "description": "Discuss passages beside their source in web pages and PDFs.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "sidePanel",
+    "offscreen",
+    "contextMenus",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "brand.js",
+        "anchors.js",
+        "client.js",
+        "passage-ui.js",
+        "conversation.js",
+        "image-capture.js",
+        "discussion-host.js",
+        "pdf/native-entry.js",
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "Margin \u00b7 Think beside the text",
+    "default_icon": {
+      "16": "icons/margin-16.png",
+      "32": "icons/margin-32.png",
+      "48": "icons/margin-48.png",
+      "128": "icons/margin-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/margin-16.png",
+    "32": "icons/margin-32.png",
+    "48": "icons/margin-48.png",
+    "128": "icons/margin-128.png"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_page": "options.html",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwStzvt4Es4NKrqENdfsod07MWaul54GJjDMeJQQ4pZCKYZjFY/lcLgT4MywOvAPwIuvh9bhCG+4pSPrbIE0rQZoUorwNpBeBjdzzUXT+Q5JTw6CHtk7IiWNZl42vIDE1SFBp50W6hxaTms/S0DJbE6DnNBLuFupZOMaDShmL04EM+OIyyRPoGUwP0E49zLYxapl1hAJYP0OOgN+4YHx/JHn3VOJLgfDY8sl7xGtu7E6fj6ZOIusV/vy5uc7KqQ8/aTPNOZvEIQcEZJsxQvyrpXl2SfhWLXtgmBD4d/IP8Ofm4Xj5kXTm/RjkosK90PhzQxD3wZMsI4PQyWkQ+RZq6wIDAQAB"
+}
