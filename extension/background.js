@@ -1,10 +1,9 @@
-import { nativeHost } from './providers/native.js';
-import { account, accountGeneration, invalidateAccount } from './providers/grant.js';
+import { nativeHost, nativeCommand } from './providers/native.js';
+import { directories, accountGeneration } from './providers/grant.js';
 import { voice, discardVoice, transferVoice, microphoneTabClosed } from './dictation/background.js';
-import { configurePdfRetention } from './pdf/background.js';
+import { configurePdfRetention, pdfSourceAction } from './pdf/background.js';
 import { sourceUrl, documentUrlForReader } from './pdf/urls.js';
 import * as store from './discussions/store.js';
-import { pdfSourceAction } from './pdf/background.js';
 import { activateTab } from './tabs.js';
 import { hasTaskHost, taskCommand } from './agents/runtime.js';
 import { executionSettings, modelOptions } from './agents/settings.js';
@@ -116,7 +115,7 @@ async function handle(action, values, sender, owner) {
     }
     case 'connectAccount': {
       const source = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-      await chrome.tabs.create({ url: chrome.runtime.getURL('connect.html#passage'), openerTabId: source?.id, windowId: source?.windowId });
+      await chrome.tabs.create({ url: chrome.runtime.getURL('connect.html?choose#passage'), openerTabId: source?.id, windowId: source?.windowId });
       return;
     }
     case 'models': return modelOptions();
@@ -171,8 +170,8 @@ async function handle(action, values, sender, owner) {
         return store.createDiscussion({ ...values, settings });
       });
     case 'send': {
-      const generation = await accountGeneration(session.model.id);
-      return retention.perform(session.sourceId, () => taskCommand({ action, sessionId: session.id, values: { ...values, generation } }));
+      const generation = await accountGeneration(session.model.id, session.model.provider);
+      return retention.perform(session.sourceId, () => taskCommand({ action, sessionId: session.id, values: { ...values, generation, authorizedModel: session.model.id } }));
     }
     case 'stop':
     case 'interaction':
@@ -190,8 +189,8 @@ chrome.runtime.onConnect.addListener(port => {
   if (port.name === 'margin-response' && port.sender.url === chrome.runtime.getURL('agents/host.html')) {
     const native = chrome.runtime.connectNative(nativeHost);
     port.onMessage.addListener(request => {
-      if (request.op !== 'response') { port.disconnect(); native.disconnect(); return; }
-      try { native.postMessage(request); } catch (error) { port.postMessage({ error: error.message }); native.disconnect(); }
+      if (!['response', 'deepseek-response'].includes(request.op)) { port.disconnect(); native.disconnect(); return; }
+      try { native.postMessage(nativeCommand(request.op, request)); } catch (error) { port.postMessage({ error: error.message }); native.disconnect(); }
     });
     native.onMessage.addListener(frame => port.postMessage(frame));
     port.onDisconnect.addListener(() => native.disconnect());
@@ -207,14 +206,16 @@ chrome.runtime.onConnect.addListener(port => {
   port.onDisconnect.addListener(() => ports.delete(port));
 });
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message.type === 'margin-stop-account-tasks' && sender.url?.split('#')[0] === chrome.runtime.getURL('connect.html')) {
-    taskCommand({ action: 'stopAll' }, { start: false }).then(() => respond({}), error => respond({ error: error.message }));
+  const fromConnectionPage = sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL('connect.html');
+  if (message.type === 'margin-stop-account-tasks' && fromConnectionPage) {
+    taskCommand({ action: 'stopProvider', provider: message.provider === 'deepseek' ? 'deepseek' : 'openai' }, { start: false }).then(() => respond({}), error => respond({ error: error.message }));
     return true;
   }
-  if (message.type === 'margin-account-changed' && sender.url?.split('#')[0] === chrome.runtime.getURL('connect.html')) {
-    invalidateAccount().then(() => {
+  if (message.type === 'margin-account-changed' && fromConnectionPage) {
+    const directory = directories[message.provider === 'deepseek' ? 'deepseek' : 'openai'];
+    directory.invalidateAccount().then(() => {
       // Start warming the directory before the connect tab returns to the reader.
-      account().catch(console.error);
+      directory.account().catch(console.error);
       for (const port of ports) port.postMessage({ type: 'account-changed' });
       respond({});
     }, error => respond({ error: error.message }));

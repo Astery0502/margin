@@ -1,4 +1,4 @@
-import { copyTestExtension } from './fixtures/native-extension.mjs';
+import { copyTestExtension, launchTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import { createServer as createTlsServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { chromium, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 const root = await mkdtemp(join(tmpdir(), 'margin-connect-check-'));
 const extension = join(root,'extension');
@@ -47,6 +47,22 @@ const server = createServer(async (req, res) => {
         const data = header + '.' + claims;
         return json({ id_token: data + '.' + sign('sha256', Buffer.from(data), privateKey).toString('base64url'),
           scope: 'openid chatgpt.tokens.use.direct', token_type: 'Bearer', access_token: 'fixture-access', refresh_token: 'fixture-refresh', expires_in: 30 });
+      }
+      case '/models':
+        if (req.headers.authorization !== 'Bearer fixture-deepseek') return res.writeHead(401).end();
+        return json({ data: [{ id: 'deepseek-flash' }, { id: 'unknown-model' }] });
+      case '/chat/completions': {
+        assert.equal(req.headers.authorization, 'Bearer fixture-deepseek');
+        const payload = JSON.parse(body);
+        assert.equal(payload.model, 'deepseek-flash');
+        assert.equal(payload.stream, true);
+        assert.match(JSON.stringify(payload.messages), /Read with DeepSeek/);
+        assert.ok(payload.tools.some(tool => tool.function.name === 'ask_reader'));
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        const chunk = (delta, finish_reason) => 'data: ' + JSON.stringify({ id: 'ds-read', model: payload.model,
+          choices: [{ index: 0, delta, finish_reason }] }) + '\n\n';
+        return res.end(chunk({ role: 'assistant', content: 'DeepSeek discussed the passage.' }, null)
+          + chunk({}, 'stop') + 'data: [DONE]\n\n');
       }
       case '/v1/models':
         assert.equal(req.headers.authorization, 'Bearer renewed');
@@ -103,8 +119,11 @@ try {
   });
   await new Promise(resolve => consentServer.listen(0, '127.0.0.1', resolve));
   const profile = join(root, 'browser');
-  const launch = () => chromium.launchPersistentContext(profile, { executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    headless: true, ignoreDefaultArgs: ['--disable-extensions'], args: ['--no-proxy-server','--host-resolver-rules=MAP auth.openai.com 127.0.0.1:' + consentServer.address().port, '--ignore-certificate-errors-spki-list=' + spki, '--load-extension=' + extension, '--disable-extensions-except=' + extension] });
+  const launch = () => launchTestExtension(extension, {
+    profile,
+    args: ['--no-proxy-server', '--host-resolver-rules=MAP auth.openai.com 127.0.0.1:' + consentServer.address().port,
+      '--ignore-certificate-errors-spki-list=' + spki],
+  });
   await copyTestExtension(extension);
   context = await launch();
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
@@ -114,6 +133,21 @@ try {
   const go = process.env.GO || await access(cachedGo).then(() => cachedGo, () => 'go');
   const binary = join(root, 'check-host');
   execFileSync(go, ['test', '-c', '-ldflags', '-X margin.local/connect.origins=' + extensionOrigin, '-o', binary], { cwd: 'companion' });
+  // Exercise the Windows upgrade UI without touching a user's existing host.
+  const upgrade = await context.newPage();
+  await upgrade.addInitScript(() => {
+    chrome.runtime.getPlatformInfo = async () => ({ os: 'win' });
+    chrome.runtime.sendNativeMessage = async (_host, command) => {
+      if (command.op !== 'capabilities') throw new Error('Unexpected credential access on an obsolete host.');
+      return { error: 'Unsupported Margin Connect operation.' };
+    };
+  });
+  await upgrade.route('**/providers/download.json', route => route.fulfill({ json: { win: 'providers/Margin-Connect-Windows.exe' } }));
+  await upgrade.goto(extensionOrigin + 'connect.html?provider=deepseek');
+  await expect(upgrade.locator('#status')).toContainText('Update Margin Connect');
+  await expect(upgrade.getByRole('link', { name: 'Download Margin Connect for Windows' })).toHaveAttribute('href', /Windows\.exe$/);
+  await expect(upgrade.locator('#key')).toBeHidden();
+  await upgrade.close();
   const page = await context.newPage();
   await page.goto(fixture);
   await page.locator('body > p').evaluate(p => {
@@ -124,8 +158,9 @@ try {
   const draft = page.getByRole('textbox', { name: 'Discussion draft' });
   await draft.fill('Keep my question.');
   const setupOpening = context.waitForEvent('page');
-  await page.getByRole('button', { name: 'Connect ChatGPT to send' }).click();
+  await page.getByRole('button', { name: 'Connect an account to send' }).click();
   const setup = await setupOpening;
+  await setup.getByRole('link', { name: 'ChatGPT subscription' }).click();
   await expect(setup.locator('#status')).toContainText('Margin Connect');
   if (await access('dist/providers/Margin-Connect-macOS.zip').then(() => true, () => false)) {
     await expect(setup.locator('#download')).toBeVisible();
@@ -183,10 +218,35 @@ try {
   const control = await context.newPage();
   await control.goto(extensionOrigin + 'connect.html');
   const sessionId = (await detail()).id;
+  const deepseek = await context.newPage();
+  await deepseek.goto(extensionOrigin + 'options.html');
+  await deepseek.getByRole('link', { name: 'Manage DeepSeek connection' }).click();
+  const connectKey = async key => {
+    await deepseek.getByLabel('DeepSeek API key').fill(key);
+    await deepseek.getByRole('button', { name: 'Connect DeepSeek' }).click();
+  };
+  await connectKey('invalid-fixture');
+  await expect(deepseek.locator('#status')).toContainText('declined');
+  await connectKey('fixture-deepseek');
+  await expect(deepseek.locator('#status')).toHaveText('Connected to DeepSeek.');
+  const modelIds = () => panel.evaluate(async () => (await PiBrowser.request('models')).models.map(model => model.id));
+  assert.deepEqual(await modelIds(), [...availableModels, 'deepseek-flash']);
+  const switchModel = id => panel.evaluate(({ sessionId, id }) =>
+    PiBrowser.request('model', { sessionId, model: { id } }), { sessionId, id });
+  await switchModel('deepseek-flash');
+  await panel.evaluate(sessionId => PiBrowser.request('send', { sessionId, text: 'Read with DeepSeek' }), sessionId);
+  await expect.poll(async () => { const entry = await detail(); if (entry.error) throw new Error(entry.error); return entry.status; }).toBe('completed');
+  assert.match(JSON.stringify((await detail()).messages), /DeepSeek discussed the passage/);
+  await switchModel('gpt-6.2-sol');
   await panel.evaluate(sessionId => PiBrowser.request('send', { sessionId, text: 'Check rate limit' }), sessionId);
   await expect.poll(async () => (await detail()).error).toMatch(/429.*usage limits/);
   await panel.evaluate(sessionId => PiBrowser.request('send', { sessionId, text: 'Keep my question in this follow-up.' }), sessionId);
   await expect.poll(() => calls).toBe(2);
+  await deepseek.getByRole('button', { name: 'Disconnect account' }).click();
+  await expect(deepseek.getByLabel('DeepSeek API key')).toBeVisible();
+  assert.deepEqual(await modelIds(), availableModels);
+  assert.equal((await detail()).status, 'running');
+  assert.equal(streamClosed, false);
   await control.getByRole('button', { name: 'Disconnect account' }).click();
   await expect.poll(() => streamClosed).toBe(true);
   await expect.poll(async () => (await detail()).status).toBe('cancelled');
@@ -208,19 +268,25 @@ try {
   await approved.goto(callback().href).catch(() => {});
   await expect(control.locator('#status')).toContainText('reader@example.test');
   await expect.poll(() => previewIds(control)).toEqual(availableModels);
+  await connectKey('fixture-deepseek');
+  await expect.poll(() => previewIds(control)).toEqual([...availableModels, 'deepseek-flash']);
+  const stored = await control.evaluate(() => chrome.storage.local.get(null));
+  assert.ok(!JSON.stringify(stored).includes('fixture-deepseek'));
   await context.close();
   context = await launch();
   const settings = await context.newPage();
   await settings.goto(extensionOrigin + 'connect.html');
   await expect(settings.locator('#status')).toContainText('reader@example.test');
-  assert.deepEqual(await previewIds(settings), availableModels);
+  assert.deepEqual(await previewIds(settings), [...availableModels, 'deepseek-flash']);
   await settings.getByRole('button', { name: 'Disconnect account' }).click();
   await expect(settings.getByRole('button', { name: 'Continue with ChatGPT' })).toBeVisible();
   assert.ok(revoked);
-  const saved = JSON.parse(await readFile(join(dir, 'session.json')));
-  assert.equal(saved.Session, null);
-  assert.equal(saved.Registration.id, clientId);
-  console.log('Native setup, OAuth verification, draft return, refresh, incremental SDK stream, restart and revocation passed.');
+  await expect.poll(() => previewIds(settings)).toEqual(['deepseek-flash']);
+  await settings.goto(extensionOrigin + 'connect.html?provider=deepseek');
+  await expect(settings.locator('#status')).toHaveText('Connected to DeepSeek.');
+  await assert.rejects(access(join(dir, 'session.json')), { code: 'ENOENT' });
+  await assert.rejects(access(join(dir, 'DeepSeek/session.json')), { code: 'ENOENT' });
+  console.log('Native setup, OAuth verification, draft return, refresh, DeepSeek streaming, independent connections, restart and revocation passed.');
 } finally {
   release?.();
   await context?.close();
@@ -228,6 +294,8 @@ try {
   consentServer?.close();
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
+  const fixtureHost = join(root, 'Margin', 'Connect', 'MarginConnect');
+  if (await access(fixtureHost).then(() => true, () => false)) execFileSync(fixtureHost, ['--clean-fixture', root]);
   await rm(root, { recursive: true, force: true });
   if (failure) throw failure;
 }

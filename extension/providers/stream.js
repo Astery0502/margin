@@ -1,8 +1,10 @@
+import { streamSimple as streamCompletions } from '@earendil-works/pi-ai/api/openai-completions';
 import { stream } from '@earendil-works/pi-ai/api/openai-responses';
 
 // Transfer a dedicated port per request so concurrent agents can stop independently.
-async function nativeFetch(generation, url, init) {
-  if (String(url) !== 'https://api.openai.com/v1/responses' || init.method !== 'POST') throw new Error('Unsupported model endpoint.');
+async function nativeFetch(provider, generation, url, init) {
+  const endpoint = provider === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/responses';
+  if (String(url) !== endpoint || init.method !== 'POST') throw new Error('Unsupported model endpoint.');
   const signal = init.signal;
   signal?.throwIfAborted();
   const { port1, port2 } = new MessageChannel();
@@ -39,12 +41,15 @@ async function nativeFetch(generation, url, init) {
       else if (data.done) { controller?.close(); close(); }
     };
     signal?.addEventListener('abort', abort, { once: true });
-    postMessage({ responseBody: init.body, generation, port: port2 }, [port2]);
+    postMessage({ responseBody: init.body, provider, generation, port: port2 }, [port2]);
   });
 }
 
 export function streamReply(model, context, options, settings, generation) {
-  return stream(model, context, { ...options, fetch: (url, init) => nativeFetch(generation, url, init), apiKey: 'native-transport', maxRetries: 0,
+  const transport = { ...options, fetch: (url, init) => nativeFetch(model.provider, generation, url, init),
+    apiKey: 'native-transport', maxRetries: 0 };
+  if (model.provider === 'deepseek') return streamCompletions(model, context, transport);
+  return stream(model, context, { ...transport,
     onPayload(params) {
       if (params.tools?.length) {
         params.input.unshift({ type: 'additional_tools', role: 'developer', tools: params.tools });

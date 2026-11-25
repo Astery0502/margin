@@ -8,13 +8,16 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
+    "build:store": "node scripts/build.js --store",
     "check:reader": "node checks/reader.mjs",
     "test": "node --test checks/*.test.mjs",
     "check:discussions": "node checks/discussions.mjs",
     "check:files": "node checks/local-files.mjs",
     "check:dictation": "node checks/dictation.mjs",
     "check": "npm run build && npm test && npm run check:reader && npm run check:discussions && npm run check:files && npm run check:dictation",
+    "build:windows": "npm run build && node scripts/build-connect.js --windows",
     "build:mac": "npm run build && node scripts/build-connect.js",
+    "check:windows": "node checks/windows-connect.mjs",
     "check:connect": "node checks/connect.mjs"
   },
   "devDependencies": {

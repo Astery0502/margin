@@ -1,5 +1,5 @@
 import preferences from '../../shared/model-preferences.cjs';
-import { bundledModels, modelCatalog } from '../providers/openai.js';
+import { bundledModels, modelCatalog } from '../providers/catalog.js';
 import { unavailableModel } from '../providers/grant.js';
 
 const initial = {
@@ -38,7 +38,7 @@ function settingsFor(agent, model, changes = {}) {
 
 export async function executionSettings(changes) {
   const [{ items, selected }, { connected, models }] = await Promise.all([profiles(), modelCatalog()]);
-  if (!connected) throw new Error('A connected OpenAI subscription is required to send a question.');
+  if (!connected) throw new Error('Connect ChatGPT or DeepSeek before sending a question.');
   const agent = items.find(item => item.id === (changes.agentId || selected));
   if (!agent) throw new Error('Choose an available agent.');
   const id = changes.model?.id || agent.modelId;

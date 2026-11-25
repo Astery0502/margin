@@ -73,7 +73,7 @@ function toolsFor(task, enabled) {
         if (closing.has(task.run.sourceId)) throw new Error('The source page is closing.');
         const child = await store.childDiscussion(task.run.activeId, question);
         signal.throwIfAborted();
-        await operate({ action: 'send', sessionId: child.id, values: { text: question, passage: child.source, generation: task.generation } });
+        await operate({ action: 'send', sessionId: child.id, values: { text: question, passage: child.source, generation: task.generation, authorizedModel: task.run.settings.model.id } });
         return textResult(child.id);
       },
     }, {
@@ -86,7 +86,7 @@ function toolsFor(task, enabled) {
         if (action === 'stop') await operate({ action: 'stop', sessionId: id });
         if (action === 'continue') {
           if (!text?.trim()) throw new Error('Provide the question for the child task.');
-          await operate({ action: 'send', sessionId: id, values: { text } });
+          await operate({ action: 'send', sessionId: id, values: { text, generation: task.generation, authorizedModel: task.run.settings.model.id } });
         }
         if (action === 'wait' && tasks.has(run.id)) {
           let abort, timer;
@@ -113,7 +113,7 @@ function queued(task) {
 
 async function start(sessionId, input) {
   if (!input.text?.trim()) throw new Error('Enter a question before sending.');
-  const { run, item } = await store.begin(sessionId);
+  const { run, item } = await store.begin(sessionId, input.authorizedModel);
   const task = { run, generation: input.generation, queued: new Map(), answers: new Map(), agent: null, stopping: false };
   tasks.set(run.id, task);
   try {
@@ -171,11 +171,11 @@ async function stop(task) {
   await task.finished;
 }
 
-async function operate({ action, sessionId, sourceId, values }) {
+async function operate({ action, sessionId, sourceId, values, provider }) {
   await ready;
-  if (action === 'stopAll') {
-    await Promise.allSettled([...starting.values()].map(entry => entry.promise));
-    await Promise.all([...tasks.values()].map(stop));
+  if (action === 'stopProvider') {
+    await Promise.allSettled([...starting.values()].filter(entry => entry.provider === provider).map(entry => entry.promise));
+    await Promise.all([...tasks.values()].filter(task => task.run.settings.model.provider === provider).map(stop));
     return;
   }
   if (action === 'closeSource') {
@@ -200,7 +200,7 @@ async function operate({ action, sessionId, sourceId, values }) {
   if (!task) {
     if (closing.has(run.sourceId) || starting.has(run.id)) throw new Error('The source or task is already changing.');
     const promise = start(sessionId, values);
-    starting.set(run.id, { sourceId: run.sourceId, promise });
+    starting.set(run.id, { sourceId: run.sourceId, provider: run.settings.model.provider, promise });
     try { return await promise; } finally { starting.delete(run.id); }
   }
   if (!task.agent || task.stopping) throw new Error('Wait for the current task to settle.');

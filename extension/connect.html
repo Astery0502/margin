@@ -10,11 +10,20 @@
 <main class="sheet connection">
   <header class="masthead">
     <img src="icons/margin-48.png" width="28" height="28" alt="">
-    <h1>Connect ChatGPT</h1>
+    <h1 id="heading">Connect an account</h1>
   </header>
   <div class="connection-body">
     <p id="status" role="status">Checking Margin Connect…</p>
-    <p id="install" hidden><a class="text-action" id="download" download>Download Margin Connect for macOS</a>. Unzip it and open the app once, then return to this tab.</p>
+    <p id="install" hidden><a class="text-action" id="download" download>Download Margin Connect</a>. <span id="install-help"></span></p>
+    <div class="actions" id="providers" hidden>
+      <a class="text-action" href="connect.html#passage">ChatGPT subscription</a>
+      <a class="text-action" href="connect.html?provider=deepseek#passage">DeepSeek API</a>
+    </div>
+    <form id="deepseek" hidden>
+      <label class="field">DeepSeek API key<input type="password" id="key" autocomplete="off" required></label>
+      <p><a class="text-action" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">Get a DeepSeek API key</a></p>
+      <button class="primary" type="submit">Connect DeepSeek</button>
+    </form>
     <label class="field" id="accounts" hidden>ChatGPT account<select id="account"></select></label>
     <div class="actions">
       <button class="primary" id="connect" hidden>Continue with ChatGPT</button>

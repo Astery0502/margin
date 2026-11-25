@@ -240,6 +240,7 @@ func (p provider) access(ctx context.Context, generation int, bound bool) (strin
 		t, err := p.token(ctx, url.Values{"grant_type": {"refresh_token"}, "client_id": {s.Registration.ClientID}, "refresh_token": {s.Session.Refresh}})
 		if errors.Is(err, invalidGrant) {
 			s.Session = nil
+			s.Generation++
 			return true, err
 		}
 		if err != nil {
@@ -248,6 +249,7 @@ func (p provider) access(ctx context.Context, generation int, bound bool) (strin
 		next, err := t.session(s.Session)
 		if err != nil {
 			s.Session = nil
+			s.Generation++
 			return true, err
 		}
 		s.Session = next

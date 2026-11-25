@@ -1,19 +1,26 @@
-import { nativeHost, nativeRequest, hostMissing } from './providers/native.js';
+import { nativeCommand, nativeHost, nativeRequest, hostMissing, outdatedHost } from './providers/native.js';
 
 const $ = id => document.getElementById(id);
 const page = await chrome.tabs.getCurrent();
 const fromPassage = location.hash === '#passage' && Number.isInteger(page?.openerTabId);
+const params = new URLSearchParams(location.search);
+const deepseek = params.get('provider') === 'deepseek';
+const provider = deepseek ? 'deepseek' : 'openai';
+const heading = params.has('choose') ? 'Connect an account' : deepseek ? 'Connect DeepSeek' : 'Connect ChatGPT';
+$('heading').textContent = heading;
+document.title = heading + ' · Margin';
 const platform = await chrome.runtime.getPlatformInfo();
 let port, authTab, timer, checking;
 let auto = fromPassage;
 let installing = false;
+let downloadList;
 let deadline = Date.now() + 120000;
 
 function show(message, ...actions) {
   $('status').textContent = message;
-  for (const id of ['accounts','install','connect','retry','cancel','disconnect','back']) $(id).hidden = !actions.includes(id);
+  for (const id of ['providers','deepseek','accounts','install','connect','retry','cancel','disconnect','back']) $(id).hidden = !actions.includes(id);
 }
-function broadcast() { return chrome.runtime.sendMessage({ type: 'margin-account-changed' }); }
+function broadcast() { return chrome.runtime.sendMessage({ type: 'margin-account-changed', provider }); }
 async function back() {
   try {
     await chrome.tabs.update(page.openerTabId, { active: true });
@@ -70,14 +77,25 @@ function login() {
       else await chrome.tabs.remove(tab.id);
     } catch (error) { cancel(error.message); }
   });
-  current.postMessage({ op: 'login', account: $('account').value });
+  current.postMessage(nativeCommand('login', { account: $('account').value }));
 }
 async function check() {
+  if (params.has('choose')) {
+    show('Choose an account for this discussion.', 'providers');
+    return;
+  }
   if (port || checking) return;
   clearTimeout(timer);
   checking = true;
   try {
-    const status = await nativeRequest('status');
+    const capabilities = await nativeRequest('capabilities');
+    if (capabilities.protocol !== 2) throw new Error('Unsupported Margin Connect operation.');
+    const status = await nativeRequest(deepseek ? 'deepseek-status' : 'status');
+    if (deepseek) {
+      if (status.connected) show('Connected to DeepSeek.', 'disconnect', ...(fromPassage ? ['back'] : []));
+      else show('Requests are billed to your DeepSeek API balance.', 'deepseek');
+      return;
+    }
     if (status.connected) {
       show('Connected to ChatGPT' + (status.email ? ' as ' + status.email : '') + '.', 'disconnect', ...(fromPassage ? ['back'] : []));
       if (auto && fromPassage) { auto = false; await broadcast(); await back(); }
@@ -89,17 +107,36 @@ async function check() {
     show('Authorize Margin to use your ChatGPT plan.', ...(accounts.length ? ['accounts'] : []), 'connect');
     if (auto) login();
   } catch (error) {
-    if (!hostMissing(error) || platform.os !== 'mac') {
-      show(platform.os !== 'mac' ? 'Margin Connect is currently available for macOS.' : error.message, 'retry');
+    const outdated = outdatedHost(error);
+    const osName = { mac: 'macOS', win: 'Windows' }[platform.os];
+    if (!osName || (!hostMissing(error) && !outdated)) {
+      show(osName ? error.message : 'Margin Connect is available for macOS and Windows.', 'retry');
       return;
     }
-    let download;
-    try { const response = await fetch('providers/download.json'); if (response.ok) download = (await response.json()).url; } catch {}
-    if (download) $('download').href = download;
-    show(download ? 'Install Margin Connect once to connect this browser.' : 'Open Margin Connect from the macOS distribution, then return here.', ...(download ? ['install'] : []), 'retry');
+    downloadList ??= fetch('providers/download.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+    const download = (await downloadList)[platform.os];
+    if (download) {
+      $('download').href = download;
+      $('download').textContent = 'Download Margin Connect for ' + osName;
+    }
+    $('install-help').textContent = platform.os === 'mac' ? 'Unzip it and open the app once, then return here.' : 'Run the installer once, then return here.';
+    const action = outdated ? 'Update' : 'Install';
+    show(action + ' Margin Connect ' + (download ? 'to connect this browser.' : 'from the ' + osName + ' distribution, then return here.'), ...(download ? ['install'] : []), 'retry');
     if (auto && Date.now() < deadline && (installing || !document.hidden)) timer = setTimeout(check, 1500);
   } finally { checking = false; }
 }
+$('deepseek').onsubmit = async event => {
+  event.preventDefault();
+  const key = $('key').value.trim();
+  if (!key) return;
+  $('key').value = '';
+  auto = false;
+  show('Checking your DeepSeek API key…');
+  try {
+    await nativeRequest('deepseek-login', { key });
+    await finish();
+  } catch (error) { show(error.message, 'deepseek'); }
+};
 $('download').onclick = () => { clearTimeout(timer); installing = true; auto = true; deadline = Date.now() + 120000; timer = setTimeout(check, 1500); };
 $('connect').onclick = login;
 $('cancel').onclick = () => cancel('Sign-in cancelled. Your draft is ready when you return.');
@@ -108,13 +145,13 @@ $('back').onclick = back;
 $('disconnect').onclick = async () => {
   show('Disconnecting your account…');
   try {
-    const stopping = chrome.runtime.sendMessage({ type: 'margin-stop-account-tasks' }).catch(() => {});
-    const result = await nativeRequest('logout');
+    const stopping = chrome.runtime.sendMessage({ type: 'margin-stop-account-tasks', provider }).catch(() => {});
+    const result = await nativeRequest(deepseek ? 'deepseek-logout' : 'logout');
     await stopping;
     auto = false;
     await broadcast();
     await check();
-    if (!result.revoked) $('status').textContent = 'Signed out locally. Confirm disconnection in ChatGPT Settings because OpenAI could not confirm revocation.';
+    if (!deepseek && !result.revoked) $('status').textContent = 'Signed out locally. Confirm disconnection in ChatGPT Settings because OpenAI could not confirm revocation.';
   } catch (error) { show(error.message, 'retry'); }
 };
 chrome.tabs.onRemoved.addListener(id => { if (port && id === authTab) cancel('Sign-in was closed. You can try again.'); });

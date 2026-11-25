@@ -1,18 +1,16 @@
-import { copyTestExtension } from './fixtures/native-extension.mjs';
+import { copyTestExtension, launchTestExtension } from './fixtures/native-extension.mjs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
-import { chromium, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 const temp = await mkdtemp(join(tmpdir(), 'margin-local-'));
 const extension = join(temp,'extension');
 let context;
 try {
   await copyTestExtension(extension);
-  context = await chromium.launchPersistentContext('', { headless: true,
-    executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    ignoreDefaultArgs: ['--disable-extensions'], args: ['--load-extension=' + extension, '--disable-extensions-except=' + extension] });
+  context = await launchTestExtension(extension);
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   const extensionId = new URL(worker.url()).host;
   const details = await context.newPage();
@@ -33,9 +31,10 @@ try {
   const draft = html.getByRole('textbox', { name: 'Discussion draft' });
   await draft.fill('Discuss my local document');
   const connecting = context.waitForEvent('page');
-  await html.getByRole('button', { name: 'Connect ChatGPT to send' }).click();
+  await html.getByRole('button', { name: 'Connect an account to send' }).click();
   const setup = await connecting;
   await expect(draft).toHaveValue('Discuss my local document');
+  await setup.getByRole('link', { name: 'DeepSeek API' }).click();
   await expect(setup.locator('#status')).toContainText('Margin Connect');
   await setup.close();
 

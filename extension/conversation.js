@@ -577,7 +577,7 @@ class PiConversation {
       if (!this.visible || this.version !== version || !this.matchesInput(input) || !this.canSend || !this.modelsConfirmed) return;
     }
     if (this.session?.status !== 'running' && !this.models.length) {
-      if (this.accountConnected) { this.modelsConfirmed = false; this.error(new Error('This account has no models supported by this build. Check plan access in ChatGPT and try again.')); return; }
+      if (this.accountConnected) { this.modelsConfirmed = false; this.error(new Error('This account has no models supported by this build. Check model access in connection settings and try again.')); return; }
       try { await PiBrowser.request('connectAccount'); } catch (error) { this.error(error); }
       return;
     }
@@ -751,7 +751,7 @@ class PiConversation {
     this.$('send').hidden = recording;
     const action = running || this.pending?.action === 'send' ? 'stop' : this.accountConnected === false ? 'connect' : this.canContinue ? 'continue' : 'send';
     const submit = this.$('send');
-    const label = { connect: 'Connect ChatGPT to send', send: 'Send', stop: 'Stop task', continue: 'Continue' }[action];
+    const label = { connect: 'Connect an account to send', send: 'Send', stop: 'Stop task', continue: 'Continue' }[action];
     submit.setAttribute('aria-label', label);
     submit.title = label;
     if (submit.dataset.action !== action) {

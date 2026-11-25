@@ -1,10 +1,10 @@
-import { copyTestExtension } from './fixtures/native-extension.mjs';
+import { copyTestExtension, launchTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { chromium, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 const sample = await readFile(new URL('./fixtures/sample.pdf', import.meta.url));
 let authenticatedReads = 0;
@@ -25,12 +25,7 @@ let context;
 try {
   const extension = join(temp, 'extension');
   await copyTestExtension(extension);
-  context = await chromium.launchPersistentContext('', {
-    executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    headless: true, ignoreDefaultArgs: ['--disable-extensions'],
-    args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension],
-    viewport: { width: 1280, height: 900 },
-  });
+  context = await launchTestExtension(extension, { viewport: { width: 1280, height: 900 } });
   const errors = [];
   context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');

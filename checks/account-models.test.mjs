@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { account, accountGeneration, cachedAccount, invalidateAccount } from '../extension/providers/grant.js';
+import { accountGeneration, directories } from '../extension/providers/grant.js';
+
+const { account, cachedAccount, invalidateAccount } = directories.openai;
 
 test('account listings remain browsable during refresh and sends use the verified login', async t => {
   let now = Date.now();
@@ -10,6 +12,7 @@ test('account listings remain browsable during refresh and sends use the verifie
   const storage = {};
   globalThis.chrome = {
     runtime: { async sendNativeMessage(_host, { op }) {
+      op = op.replace(/^v2-/, '');
       calls.push(op);
       if (op === 'status') return { selected: 'reader', connected, generation };
       fetching?.resolve();

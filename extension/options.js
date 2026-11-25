@@ -1,5 +1,5 @@
 import preferences from '../shared/model-preferences.cjs';
-import { bundledModels } from './providers/openai.js';
+import { bundledModels } from './providers/catalog.js';
 import { profiles, saveProfiles } from './agents/settings.js';
 
 const $ = id => document.getElementById(id);
@@ -16,6 +16,7 @@ function showModels(id) {
   picker.select(id, (model?.name || id) + ' (unavailable)');
 }
 function showThinking(selected) {
+  $('tier').closest('label').hidden = !catalog.get(picker.value)?.speedTiers.includes('fast');
   const levels = catalog.get(picker.value)?.thinkingLevels || [selected || 'off'];
   $('thinking-field').hidden = levels.length < 2;
   $('thinking').replaceChildren(...levels.map(level => new Option(preferences.label(level), level)));
@@ -61,7 +62,7 @@ $('agent-form').onsubmit = async event => {
   event.preventDefault();
   const agent = config.items.find(item => item.id === $('profile').value);
   Object.assign(agent, { name: $('name').value.trim(), instructions: $('instructions').value, modelId: picker.value,
-    thinking: $('thinking').value, tier: $('tier').checked ? 'fast' : 'default', tools: ['ask', 'notes', 'delegate'].filter(tool => $(tool).checked) });
+    thinking: $('thinking').value, tier: !$('tier').closest('label').hidden && $('tier').checked ? 'fast' : 'default', tools: ['ask', 'notes', 'delegate'].filter(tool => $(tool).checked) });
   config.selected = agent.id;
   try { await saveProfiles(config); show(agent.id); $('status').textContent = 'Agent settings saved.'; }
   catch (error) { $('status').textContent = error.message; }

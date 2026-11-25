@@ -1,4 +1,4 @@
-function relayResponse(body, generation, port) {
+function relayResponse(body, provider, generation, port) {
   const native = chrome.runtime.connect({ name: 'margin-response' });
   function close() { native.disconnect(); port.close(); }
   port.onmessage = close;
@@ -11,7 +11,7 @@ function relayResponse(body, generation, port) {
     port.postMessage({ error });
     port.close();
   });
-  try { native.postMessage({ op: 'response', body, generation }); }
+  try { native.postMessage({ op: provider === 'deepseek' ? 'deepseek-response' : 'response', body, generation }); }
   catch (error) { port.postMessage({ error: error.message }); close(); }
 }
 // The offscreen document owns the worker across view changes and service worker suspension.
@@ -20,7 +20,7 @@ const pending = new Map();
 function startWorker() {
   worker = new Worker('worker.js', { type: 'module' });
   worker.onmessage = ({ data }) => {
-    if (data.port) { relayResponse(data.responseBody, data.generation, data.port); return; }
+    if (data.port) { relayResponse(data.responseBody, data.provider, data.generation, data.port); return; }
     if (data.event) { chrome.runtime.sendMessage({ type: 'task-event', event: data.event }).catch(console.error); return; }
     pending.get(data.id)?.(data);
     pending.delete(data.id);
@@ -33,7 +33,7 @@ function startWorker() {
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type !== 'task-command' || sender.url !== chrome.runtime.getURL('background.js')) return;
-  if (!worker && ['closeSource', 'stopAll'].includes(message.command.action)) { respond({}); return; }
+  if (!worker && ['closeSource', 'stopProvider'].includes(message.command.action)) { respond({}); return; }
   if (!worker) startWorker();
   const id = crypto.randomUUID();
   pending.set(id, respond);

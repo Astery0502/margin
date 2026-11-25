@@ -1,11 +1,11 @@
-import { copyTestExtension } from './fixtures/native-extension.mjs';
+import { copyTestExtension, launchTestExtension } from './fixtures/native-extension.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rename, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 const temp = await mkdtemp(join(tmpdir(), 'margin-speech-'));
 const audio = join(temp, 'speech.wav');
@@ -31,10 +31,8 @@ async function checkDictation({ voice, speech, expected, duration = 4600, langua
     execFileSync('say', ['-v', voice, '-o', join(temp, 'speech.aiff'), speech]);
     execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', '-c', '1', join(temp, 'speech.aiff'), audio]);
     if (checkLifecycle) await rename(model, model + '.unavailable');
-    browser = await chromium.launchPersistentContext('', {
-      headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-      ignoreDefaultArgs: ['--disable-extensions'], args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension,
-        '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + audio],
+    browser = await launchTestExtension(extension, {
+      args: ['--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + audio],
     });
     const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker');
     const settings = await browser.newPage();

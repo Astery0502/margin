@@ -1,3 +1,4 @@
+import { chromium } from '@playwright/test';
 import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -11,4 +12,14 @@ export async function copyTestExtension(directory) {
     if (isolated === source) throw new Error('Missing native host binding in ' + file);
     await writeFile(path, isolated);
   }
+}
+
+export function launchTestExtension(extension, { profile = '', args = [], ...options } = {}) {
+  return chromium.launchPersistentContext(profile, {
+    headless: true,
+    executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    ignoreDefaultArgs: ['--disable-extensions'],
+    args: ['--load-extension=' + extension, '--disable-extensions-except=' + extension, ...args],
+    ...options,
+  });
 }

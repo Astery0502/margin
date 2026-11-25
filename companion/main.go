@@ -19,8 +19,8 @@ import (
 var origins string // Filled from the extension manifest at build time.
 
 type command struct {
-	Op, Body, Account string
-	Generation        int
+	Op, Body, Account, Key string
+	Generation             int
 }
 type message = map[string]any
 
@@ -147,14 +147,18 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 		}
 		return send(message{"connected": true, "modelIds": ids, "names": names})
 	}
+	return streamFrames(res, send, "OpenAI")
+}
+
+func streamFrames(res *http.Response, send func(any) error, name string) error {
 	// Subscription responses can omit Content-Type. The SDK validates the SSE terminal event.
 	if header := res.Header.Get("Content-Type"); header != "" {
 		media, _, err := mime.ParseMediaType(header)
 		if err != nil || media != "text/event-stream" {
-			return errors.New("OpenAI did not return a streaming response.")
+			return fmt.Errorf("%s did not return a streaming response.", name)
 		}
 	}
-	if err = send(message{"start": true}); err != nil {
+	if err := send(message{"start": true}); err != nil {
 		return err
 	}
 	buf := make([]byte, 32<<10)
@@ -176,6 +180,9 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 }
 
 func (p provider) operate(ctx context.Context, cmd command, send func(any) error) error {
+	if strings.HasPrefix(cmd.Op, "deepseek-") {
+		return p.deepseek(ctx, cmd, send)
+	}
 	switch cmd.Op {
 	case "status":
 		var status message
@@ -209,18 +216,54 @@ func (p provider) operate(ctx context.Context, cmd command, send func(any) error
 	}
 }
 func main() {
-	home, err := os.UserHomeDir()
+	support, err := supportDirectory()
 	if err != nil {
-		return
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	support := filepath.Join(home, "Library", "Application Support")
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	p := provider{issuer, resource, client, vault{filepath.Join(support, "Margin", "Connect")}}
 	if len(os.Args) == 1 || strings.HasPrefix(os.Args[1], "-psn_") {
 		setupWindow(support)
 		return
 	}
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	p := provider{issuer, resource, client, vault{filepath.Join(support, "Margin", "Connect")}}
+	if os.Args[1] == "--remove-accounts" {
+		confirmed, err := p.removeAccounts()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if !confirmed {
+			os.Exit(2)
+		}
+		return
+	}
 	runNative(p)
+}
+
+func (p provider) removeAccounts() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	lock, err := hostLock(p.vault.directory, true)
+	if err != nil {
+		return false, err
+	}
+	defer lock.Close()
+	confirmed, err := p.logout(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, v := range []vault{p.vault, {filepath.Join(p.vault.directory, "DeepSeek")}} {
+		// Migrate any old credential before removing it, including DeepSeek-only installs.
+		if err := v.transaction(ctx, func(s *state) (bool, error) { return false, nil }); err != nil {
+			return false, err
+		}
+		if err := records.remove(v.directory); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	}
+	return confirmed, nil
 }
 
 func runNative(p provider) {
@@ -231,11 +274,22 @@ func runNative(p provider) {
 	if err != nil {
 		return
 	}
+	if cmd.Op == "capabilities" {
+		frame(message{"protocol": 2})
+		return
+	}
+	cmd.Op = strings.TrimPrefix(cmd.Op, "v2-")
+	lock, err := hostLock(p.vault.directory, false)
+	if err != nil {
+		frame(message{"error": err.Error()})
+		return
+	}
+	defer lock.Close()
 	limit := 45 * time.Second
 	if cmd.Op == "login" {
 		limit = 5 * time.Minute
 	}
-	if cmd.Op == "response" {
+	if cmd.Op == "response" || cmd.Op == "deepseek-response" {
 		limit = 30 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), limit)

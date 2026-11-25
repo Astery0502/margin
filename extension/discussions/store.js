@@ -250,9 +250,10 @@ export async function history(id) {
 }
 
 // The token identifies one run, even if a stopped discussion is immediately resumed.
-export async function begin(id) {
+export async function begin(id, authorizedModel) {
   const tx = (await database).transaction(['discussions', 'executions'], 'readwrite');
   const { item, run } = await lookup(id, tx);
+  if (run.settings.model.id !== authorizedModel) throw new Error('The selected model changed. Send again from the discussion.');
   if (run.status === 'running') throw new Error('Another task is already running in this discussion.');
   const token = crypto.randomUUID();
   Object.assign(run, { token, status: 'running', activeId: id, partial: null, error: null, queuedMessages: {}, interactionRequests: [] });

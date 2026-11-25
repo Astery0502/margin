@@ -1,3 +1,4 @@
+import { launchTestExtension } from './fixtures/native-extension.mjs';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -31,13 +32,17 @@ try {
       build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `
         export const nativeHost = 'dev.margin.test_connect';
         export const hostMissing = () => false;
+        export const outdatedHost = () => false;
+        export const nativeCommand = (op, fields) => ({ ...fields, op });
         export async function nativeRequest(op) {
+          if (op === 'deepseek-status') return { connected: false };
           if (op === 'status') return { connected: true, selected: 'reader', generation: 1 };
           return { connected: true, ...(await (await fetch(${JSON.stringify(origin + '/models')})).json()) };
         }` }));
     } }] });
-  context = await chromium.launchPersistentContext(join(root, 'profile'), { headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    ignoreDefaultArgs: ['--disable-extensions'], args: ['--use-fake-device-for-media-stream', '--remote-debugging-port=0', '--disable-extensions-except=' + extension, '--load-extension=' + extension] });
+  context = await launchTestExtension(extension, {
+    profile: join(root, 'profile'), args: ['--use-fake-device-for-media-stream', '--remote-debugging-port=0'],
+  });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   const page = await context.newPage();
   const errors = [];
