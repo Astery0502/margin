@@ -12,31 +12,88 @@ const audio = join(temp, 'speech.wav');
 const extension = join(temp, 'extension');
 const model = join(extension, 'dictation/models/Xenova/whisper-tiny/onnx/encoder_model_quantized.onnx');
 const server = createServer((_req, res) => res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Reading</title><p>Discuss this passage in your own words.</p>'));
-let browser;
 try {
   await copyTestExtension(extension);
-  await rename(model, model + '.unavailable');
-  execFileSync('say', ['-v', 'Samantha', '-o', join(temp, 'speech.aiff'), 'This is a reading test. The book is on the table.']);
-  execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', '-c', '1', join(temp, 'speech.aiff'), audio]);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  browser = await chromium.launchPersistentContext('', {
-    headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    ignoreDefaultArgs: ['--disable-extensions'], args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension,
-      '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + audio],
-  });
-  const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker');
-  const settings = await browser.newPage();
-  await settings.goto(new URL('options.html', worker.url()).href);
-  const page = await browser.newPage();
-  await page.goto('http://127.0.0.1:' + server.address().port);
-  await page.locator('body > p').evaluate(p => {
-    const range = document.createRange(); range.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(range);
-    p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-  });
-  await page.getByRole('button', { name: 'Quick', exact: true }).click();
-  const draft = page.getByRole('textbox', { name: 'Discussion draft' });
-  await draft.fill('Notes:');
-  const record = page.getByRole('button', { name: 'Record', exact: true });
+  await checkDictation({ voice: 'Tingting', speech: '今天天气很好，我们一起去公园散步。', expected: /今天|天[气氣]|公[园園]|散步/ });
+  await checkDictation({ voice: 'Samantha', speech: 'This is a reading test. The book is on the table.', expected: /reading|book|table/i });
+  await checkDictation({ voice: 'Tingting', speech: '今天天气很好。[[slnc 600]] The book is on the table.',
+    expected: /(?:今天|天[气氣]).*(?:book|table)/is, duration: 6500, checkLifecycle: true });
+  await checkDictation({ voice: 'Samantha', speech: 'The book is on the table.', expected: /book.*table/i, language: 'en' });
+} finally {
+  if (server.listening) await new Promise(resolve => server.close(resolve));
+  await rm(temp, { recursive: true, force: true });
+}
+
+async function checkDictation({ voice, speech, expected, duration = 4600, language, checkLifecycle = false }) {
+  let browser;
+  try {
+    execFileSync('say', ['-v', voice, '-o', join(temp, 'speech.aiff'), speech]);
+    execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', '-c', '1', join(temp, 'speech.aiff'), audio]);
+    if (checkLifecycle) await rename(model, model + '.unavailable');
+    browser = await chromium.launchPersistentContext('', {
+      headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      ignoreDefaultArgs: ['--disable-extensions'], args: ['--disable-extensions-except=' + extension, '--load-extension=' + extension,
+        '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + audio],
+    });
+    const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker');
+    const settings = await browser.newPage();
+    await settings.goto(new URL('options.html', worker.url()).href);
+    const spokenLanguage = settings.getByLabel('Spoken language');
+    await expect(spokenLanguage).toBeEnabled();
+    await expect(spokenLanguage).toHaveValue('auto');
+    if (language) {
+      await spokenLanguage.selectOption(language);
+      await expect(settings.getByText('Dictation language saved.')).toBeVisible();
+      await settings.reload();
+      await expect(spokenLanguage).toHaveValue(language);
+    }
+    const page = await browser.newPage();
+    await page.goto('http://127.0.0.1:' + server.address().port);
+    await page.locator('body > p').evaluate(p => {
+      const range = document.createRange(); range.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(range);
+      p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    await page.getByRole('button', { name: 'Quick', exact: true }).click();
+    const draft = page.getByRole('textbox', { name: 'Discussion draft' });
+    await draft.fill('Notes:');
+    const record = page.getByRole('button', { name: 'Record', exact: true });
+    if (checkLifecycle) {
+      await checkMicrophonePermission(browser, page, record);
+    } else {
+      await browser.grantPermissions(['microphone']);
+      await record.click();
+    }
+    await page.bringToFront();
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
+    if (checkLifecycle) {
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Return to recording draft' }).click();
+    }
+    await page.waitForTimeout(duration);
+    await page.getByRole('button', { name: 'Stop recording' }).click();
+    if (checkLifecycle) {
+      await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible({ timeout: 20000 });
+      await page.getByRole('button', { name: 'Listen', exact: true }).click();
+      await expect(page.locator('#voice-audio')).toHaveAttribute('src', /^data:audio/);
+      await rename(model + '.unavailable', model);
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    }
+    await expect(draft).toHaveValue(expected, { timeout: 90000 });
+    const transcript = await draft.inputValue();
+    if (checkLifecycle) {
+      await record.click();
+      await page.getByRole('button', { name: 'Cancel dictation' }).click();
+      await expect(draft).toHaveValue(transcript);
+    }
+    assert.match(transcript, /^Notes:/);
+    console.log('Local dictation passed:', transcript);
+  } finally {
+    await browser?.close();
+  }
+}
+
+async function checkMicrophonePermission(browser, page, record) {
   async function requestPermission() {
     const opening = browser.waitForEvent('page', { predicate: p => p !== page });
     await record.click();
@@ -54,26 +111,4 @@ try {
   const permission = await requestPermission();
   await browser.grantPermissions(['microphone']);
   await permission.getByRole('button', { name: 'Allow microphone and start' }).click();
-  await page.bringToFront();
-  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Return to recording draft' }).click();
-  await page.waitForTimeout(4600);
-  await page.getByRole('button', { name: 'Stop recording' }).click();
-  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible({ timeout: 20000 });
-  await page.getByRole('button', { name: 'Listen', exact: true }).click();
-  await expect(page.locator('#voice-audio')).toHaveAttribute('src', /^data:audio/);
-  await rename(model + '.unavailable', model);
-  await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await expect(draft).toHaveValue(/Notes:\s*[\s\S]*(reading|book|table)/i, { timeout: 90000 });
-  const transcript = await draft.inputValue();
-  await record.click();
-  await page.getByRole('button', { name: 'Cancel dictation' }).click();
-  await expect(draft).toHaveValue(transcript);
-  assert.match(transcript, /^Notes:/);
-  console.log('Real local Whisper transcription, original draft return and cancellation passed.');
-} finally {
-  await browser?.close();
-  if (server.listening) await new Promise(resolve => server.close(resolve));
-  await rm(temp, { recursive: true, force: true });
 }
