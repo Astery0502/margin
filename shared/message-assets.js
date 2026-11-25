@@ -11,6 +11,7 @@ export const messageAssets = new Map([
 ]);
 
 export const interactionAssets = new Map([
+  ['model-preferences.js', new URL('./model-preferences.cjs', import.meta.url)],
   ['extension-ui.js', new URL('./web/extension-ui.js', import.meta.url)],
 ]);
 

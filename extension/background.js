@@ -1,6 +1,5 @@
 import { nativeHost } from './providers/native.js';
-import { invalidateModels } from './providers/openai.js';
-import { accountGeneration } from './providers/grant.js';
+import { account, accountGeneration, invalidateAccount } from './providers/grant.js';
 import { voice, discardVoice, transferVoice, microphoneTabClosed } from './dictation/background.js';
 import { configurePdfRetention } from './pdf/background.js';
 import { sourceUrl, documentUrlForReader } from './pdf/urls.js';
@@ -103,6 +102,7 @@ async function handle(action, values, sender, owner) {
   const session = values.sessionId && !values.sessionId.startsWith('draft:') ? await store.get(values.sessionId) : null;
   if (session && !isPanel(sender) && sourceId !== session.sourceId) throw new Error('This discussion belongs to another source.');
   switch (action) {
+    case 'modelPreview': return modelOptions('preview');
     case 'identifier': return crypto.randomUUID();
     case 'sourceView': return retention.register(sender.tab.id, sender.url);
     case 'list': return store.list(sourceId);
@@ -120,7 +120,6 @@ async function handle(action, values, sender, owner) {
       return;
     }
     case 'models': return modelOptions();
-    case 'modelDefaults': return (await modelOptions(values.settings?.agentId, values.settings)).defaults;
     case 'model': {
       const settings = await executionSettings(values.agentId ? values : { ...session, ...values });
       const result = await store.edit(session.id, settings);
@@ -171,7 +170,7 @@ async function handle(action, values, sender, owner) {
         return store.createDiscussion({ ...values, settings });
       });
     case 'send': {
-      const generation = await accountGeneration();
+      const generation = await accountGeneration(session.model.id);
       return retention.perform(session.sourceId, () => taskCommand({ action, sessionId: session.id, values: { ...values, generation } }));
     }
     case 'stop':
@@ -212,10 +211,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     return true;
   }
   if (message.type === 'margin-account-changed' && sender.url?.split('#')[0] === chrome.runtime.getURL('connect.html')) {
-    invalidateModels();
-    for (const port of ports) port.postMessage({ type: 'account-changed' });
-    respond({});
-    return;
+    invalidateAccount().then(() => {
+      // Start warming the directory before the connect tab returns to the reader.
+      account().catch(console.error);
+      for (const port of ports) port.postMessage({ type: 'account-changed' });
+      respond({});
+    }, error => respond({ error: error.message }));
+    return true;
   }
   if (message.type === 'pi-dictation') {
     const dispatch = async () => {

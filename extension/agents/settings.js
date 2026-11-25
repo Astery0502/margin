@@ -1,4 +1,6 @@
-import { modelCatalog } from '../providers/openai.js';
+import preferences from '../../shared/model-preferences.cjs';
+import { bundledModels, modelCatalog } from '../providers/openai.js';
+import { unavailableModel } from '../providers/grant.js';
 
 const initial = {
   id: 'reader', name: 'Reader', instructions: 'Discuss the selected passage in the context of the reader’s question.',
@@ -21,24 +23,26 @@ export async function saveProfiles({ items, selected }) {
   await chrome.storage.local.set({ agentProfiles: { selected, items } });
 }
 
-export async function modelOptions(agentId, changes = {}) {
-  const [{ items, selected }, { connected, models: catalog }] = await Promise.all([profiles(), modelCatalog()]);
-  const agent = items.find(item => item.id === (agentId || selected));
-  if (!agent) throw new Error('Choose an available agent.');
-  const requested = changes.model?.id || agent.modelId;
-  const model = catalog.find(model => model.id === requested) || catalog[0];
-  const thinking = changes.thinking || agent.thinking;
-  const tier = changes.tier || agent.tier;
-  return { connected, models: catalog, agents: items.map(({ id, name }) => ({ id, name })), defaults: {
-    agentId: agent.id, model, thinking: model?.thinkingLevels.includes(thinking) ? thinking : model?.thinkingLevels[0],
-    tier: model?.speedTiers.includes(tier) ? tier : 'default',
-  } };
+export async function modelOptions(mode = 'refresh') {
+  const [{ items, selected }, { connected, models }, bundled] = await Promise.all([profiles(), modelCatalog(mode), bundledModels()]);
+  const agents = items.map(agent => {
+    const model = connected === null ? bundled.get(agent.modelId) : models.find(item => item.id === agent.modelId) || models[0];
+    return { id: agent.id, name: agent.name, defaults: settingsFor(agent, model) };
+  });
+  return { connected, models, agents, defaults: agents.find(agent => agent.id === selected)?.defaults };
+}
+
+function settingsFor(agent, model, changes = {}) {
+  return preferences.normalize({ agentId: agent.id, model, thinking: changes.thinking || agent.thinking, tier: changes.tier || agent.tier });
 }
 
 export async function executionSettings(changes) {
-  const { defaults } = await modelOptions(changes.agentId, changes);
-  if (!defaults.model) throw new Error('A connected OpenAI subscription is required to send a question.');
-  const { items } = await profiles();
-  const agent = items.find(item => item.id === defaults.agentId);
-  return { ...defaults, instructions: agent.instructions, tools: agent.tools };
+  const [{ items, selected }, { connected, models }] = await Promise.all([profiles(), modelCatalog()]);
+  if (!connected) throw new Error('A connected OpenAI subscription is required to send a question.');
+  const agent = items.find(item => item.id === (changes.agentId || selected));
+  if (!agent) throw new Error('Choose an available agent.');
+  const id = changes.model?.id || agent.modelId;
+  const model = models.find(item => item.id === id) || (!changes.model && models[0]);
+  if (!model) throw unavailableModel(id);
+  return { ...settingsFor(agent, model, changes), instructions: agent.instructions, tools: agent.tools };
 }

@@ -46,7 +46,7 @@ class PiConversation {
         *{box-sizing:border-box}[hidden]{display:none!important}button,textarea,input{font:inherit}button{cursor:pointer;border:1px solid #d9e2d3;background:#f3f7ec;color:#426344;border-radius:7px;padding:6px 10px}button:disabled{opacity:.5;cursor:default}button:focus-visible,textarea:focus-visible{outline:2px solid #6b8f60;outline-offset:2px}
         header{padding-bottom:10px;border-bottom:1px solid #dfe6d9}.heading{display:flex;align-items:start;gap:6px}h3{margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere;flex:1;min-width:0}.source-context{margin-top:5px;font-size:11px;color:#7a8d6c}.source-context summary{cursor:pointer;width:max-content}.source-context[open] summary{margin-bottom:6px}.origin{display:flex;gap:8px;align-items:start;margin-top:5px}.origin a{color:#6e8065;font-size:11px;overflow-wrap:anywhere;flex:1}blockquote{margin:10px 0;padding-left:10px;border-left:2px solid #bfceb1;font-size:12px;color:#6b7c60;max-height:85px;overflow:auto}
         #messages{flex:1;min-height:${composerHeights.messages}px;overflow:auto;overscroll-behavior:contain;padding:10px 0}.message{padding:10px 0;border-bottom:1px solid #e7ebdf;overflow-wrap:anywhere}.speaker{font-size:10px;color:#7f9073;display:block;margin-bottom:4px}.message-body:not(.markdown){white-space:pre-wrap;margin:0}.empty{color:#829077;font-size:12px}summary{cursor:pointer}
-        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:11px;color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}.model-options{position:fixed;inset:auto;margin:0;width:260px;max-width:calc(100vw - 48px);z-index:5;border:1px solid #c9d7bf;border-radius:9px;padding:12px;background:#f8fbf4;box-shadow:0 4px 18px #233a2520}.model-options label{display:block;margin-bottom:8px}.model-options select{display:block;width:100%;min-width:0;font:inherit;color:#36523b;background:#fff;border:1px solid #d9e2d3;border-radius:5px;padding:5px}.model-options p{margin:4px 0 0;color:#7a8d6c;line-height:1.5}
+        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:11px;color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}
         form{container-type:inline-size;flex-shrink:0;border:1px solid #d9e2d3;border-radius:10px;background:#f1f5eb;padding:8px;margin-top:8px}textarea{width:100%;display:block;min-height:${composerHeights.followup}px;max-height:${composerHeights.followupLimit}px;resize:none;border:0;background:transparent;color:#2d4435;line-height:1.6;padding:2px}.actions{display:flex;min-width:0;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}#send{background:#365d3e;border-color:#365d3e;color:#fff}#voice-recovery{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}#voice-recovery audio{width:100%;height:32px}#voice{font-size:11px}#cancel-voice{font-size:11px}.status{font-size:11px;color:#76866a;min-height:18px;margin:6px 0 0}#error{color:#a04c36;white-space:pre-wrap}.status:empty{display:none}
         ${marginBrand.styles}
         :host(.external-title) #header{display:flex;align-items:start;gap:8px}:host(.external-title) .source-context{flex:1;min-width:0;margin-top:0}
@@ -78,12 +78,24 @@ class PiConversation {
         #keyboard-hints{display:flex;flex:none;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:5px 0 0;font-size:11px;color:#76866a}kbd{font:inherit;color:#526c43}:host(:not(.new)) #model-settings{margin-right:auto}
         @container (max-width:330px){:host(.new) textarea{flex-basis:calc(100% - 32px);min-width:0}:host(.new) .actions{flex-basis:100%;max-width:100%}}
         ${inline ? ':host(.new) .actions{padding-right:12px}' : ''}
+        .model-options {
+          position:fixed; inset:auto; margin:0; padding:12px;
+          width:max-content; max-width:min(260px,calc(100vw - 16px)); max-height:calc(100dvh - 16px);
+          overflow:auto; overscroll-behavior:contain; border:1px solid #c9d7bf;
+          border-radius:9px; background:#f8fbf4; box-shadow:0 4px 18px #233a2520;
+        }
+        .model-options:popover-open { display:grid; gap:8px; }
+        #agent-control, #thinking-control { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:10px; }
+        .model-options select { min-width:0; width:100%; font:inherit; color:#36523b; background:white; border:1px solid #d9e2d3; border-radius:5px; padding:5px; }
+        #model-control { width:210px; max-width:100%; min-width:0; }
+        #model-picker { margin-top:3px; }
+        #tier { vertical-align:middle; margin:0 5px 0 0; accent-color:#365d3e; }
       </style>
       <header id="header"><div class="heading"><h3 id="title">Discussion</h3><div id="header-actions" class="discussion-actions">${discussionActions.html}</div></div><details class="source-context"><summary>Source</summary><div class="origin"><a id="origin" target="_blank" rel="noreferrer"></a></div><blockquote id="quote"></blockquote></details></header>
       <div id="extension-requests" aria-live="polite"></div><div id="messages" aria-live="polite"></div>
       <div id="activity" role="status" hidden><span id="activity-spinner" aria-hidden="true"></span><span id="activity-label">Working</span></div>
       <div id="queued-inputs" aria-label="Pending messages" aria-live="polite" hidden></div>
-      <form id="composer"><blockquote id="attached-quote" hidden></blockquote><details id="images" hidden><summary id="image-count"></summary><div id="image-previews"></div></details><span id="draft-pi" aria-hidden="true">${marginBrand.icon}</span><textarea id="draft" rows="1" aria-label="Discussion draft" placeholder="Ask about this passage…" disabled></textarea><div class="actions"><button id="cancel-voice" type="button" aria-label="Cancel dictation" title="Cancel dictation" hidden>${voiceIcons.cancel}</button><span id="recording-status" role="status" hidden></span><div id="voice-waveform" role="img" aria-label="Microphone activity" hidden><svg viewBox="0 0 192 28" preserveAspectRatio="none" aria-hidden="true"><path/></svg></div><div id="model-settings"><button id="model-summary" type="button" popovertarget="model-options" aria-label="Model settings"><span class="model-name" id="model-name">Model</span><span class="model-option reasoning-bars" id="thinking-name" aria-hidden="true" hidden><svg viewBox="0 0 15 14"><rect x="0" y="10" width="2" height="4"/><rect x="3" y="8" width="2" height="6"/><rect x="6" y="6" width="2" height="8"/><rect x="9" y="3" width="2" height="11"/><rect x="12" y="0" width="2" height="14"/></svg></span><span class="model-option" id="tier-name" aria-hidden="true" hidden><svg viewBox="0 0 16 16"><path d="M9 0 2 9h5l-1 7 8-10H9z"/></svg></span></button><div id="model-options" class="model-options" popover><label>Model<select id="model" aria-label="Model" disabled><option>Model</option></select></label><label id="thinking-control">Reasoning<select id="thinking" aria-label="Reasoning level" disabled></select></label><label id="tier-control">Speed<select id="tier" aria-label="Speed mode" disabled></select></label><p>Changes become the default for new conversations.</p></div></div><button id="add-image" type="button" aria-label="Add image" title="Add image" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 4-5 4 5"/></svg></button><button id="voice" type="button" aria-label="Record" title="Record" hidden>${voiceIcons.record}</button><button id="send" type="button" aria-label="Send" title="Send" disabled>${composerIcons.send}</button></div></form>
+      <form id="composer"><blockquote id="attached-quote" hidden></blockquote><details id="images" hidden><summary id="image-count"></summary><div id="image-previews"></div></details><span id="draft-pi" aria-hidden="true">${marginBrand.icon}</span><textarea id="draft" rows="1" aria-label="Discussion draft" placeholder="Ask about this passage…" disabled></textarea><div class="actions"><button id="cancel-voice" type="button" aria-label="Cancel dictation" title="Cancel dictation" hidden>${voiceIcons.cancel}</button><span id="recording-status" role="status" hidden></span><div id="voice-waveform" role="img" aria-label="Microphone activity" hidden><svg viewBox="0 0 192 28" preserveAspectRatio="none" aria-hidden="true"><path/></svg></div><div id="model-settings"><button id="model-summary" type="button" popovertarget="model-options" aria-label="Model settings"><span class="model-name" id="model-name">Model</span><span class="model-option reasoning-bars" id="thinking-name" aria-hidden="true" hidden><svg viewBox="0 0 15 14"><rect x="0" y="10" width="2" height="4"/><rect x="3" y="8" width="2" height="6"/><rect x="6" y="6" width="2" height="8"/><rect x="9" y="3" width="2" height="11"/><rect x="12" y="0" width="2" height="14"/></svg></span><span class="model-option" id="tier-name" aria-hidden="true" hidden><svg viewBox="0 0 16 16"><path d="M9 0 2 9h5l-1 7 8-10H9z"/></svg></span></button><div id="model-options" class="model-options" popover><label id="agent-control" hidden>Agent<select id="agent"></select></label><div id="model-control" hidden>Model<div id="model-picker"></div></div><label id="thinking-control">Reasoning<select id="thinking" aria-label="Reasoning level" disabled></select></label><label id="tier-control"><input type="checkbox" id="tier" disabled> Fast mode</label></div></div><button id="add-image" type="button" aria-label="Add image" title="Add image" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 4-5 4 5"/></svg></button><button id="voice" type="button" aria-label="Record" title="Record" hidden>${voiceIcons.record}</button><button id="send" type="button" aria-label="Send" title="Send" disabled>${composerIcons.send}</button></div></form>
       <div id="keyboard-hints" hidden><span><kbd>Enter</kbd> <span id="submit-hint">send</span></span><span id="queue-hint" hidden><kbd>Tab</kbd> queue</span><span><kbd>Shift + Enter</kbd> new line</span></div>
       <p id="status" class="status" role="status"></p><p id="voice-status" class="status" role="status"></p><div id="voice-recovery" hidden><button id="retry-voice" type="button">Retry</button><button id="listen-voice" type="button">Listen</button><audio id="voice-audio" controls hidden></audio></div><p id="error" class="status" role="alert"></p>`;
     this.$ = id => this.shadow.getElementById(id);
@@ -106,10 +118,13 @@ class PiConversation {
       if (action === 'fork') this.fork();
       if (action === 'panel') this.openPanel();
     });
-    this.agentPicker = document.createElement('select');
-    this.agentPicker.setAttribute('aria-label', 'Agent');
-    this.$('model-options').prepend(this.agentPicker);
-    this.agentPicker.addEventListener('change', () => this.changeModelSettings({ agentId: this.agentPicker.value }));
+    this.modelPicker = new MarginModelPicker(this.$('model-picker'), 'Model', id => {
+      this.changeModelSettings({ model: this.models.find(model => model.id === id) });
+    });
+    this.$('model-options').addEventListener('click', () => {
+      if (this.$('model-options').matches(':popover-open')) this.positionModelOptions();
+    });
+    this.$('agent').addEventListener('change', () => this.changeModelSettings({ agentId: this.$('agent').value }));
     this.unsubscribe = PiBrowser.subscribe(event => this.changed(event));
     this.unbindQuotes = PiMessages.bindQuoteSelection(this.$('messages'), text => {
       const draft = this.$('draft');
@@ -148,12 +163,8 @@ class PiConversation {
       options.showPopover();
       this.positionModelOptions();
     });
-    for (const field of ['model', 'thinking', 'tier']) this.$(field).addEventListener('change', () => {
-      const values = field === 'model'
-        ? { model: this.models.find(model => `${model.provider}/${model.id}` === this.$('model').value) }
-        : { [field]: this.$(field).value };
-      this.changeModelSettings(values);
-    });
+    this.$('thinking').onchange = () => this.changeModelSettings({ thinking: this.$('thinking').value });
+    this.$('tier').onchange = () => this.changeModelSettings({ tier: this.$('tier').checked ? 'fast' : 'default' });
     this.extensionUI = new PiExtensionUI(this.$('extension-requests'), async (sessionId, requestId, answer) => {
       try { return await PiBrowser.request('interaction', { sessionId, requestId, answer }); }
       finally { if (this.id === sessionId) await this.refresh(); }
@@ -193,43 +204,68 @@ class PiConversation {
     } catch (error) { if (current()) this.error(error); }
   }
 
-  async loadModels() {
-    if (this.models) return;
-    try {
-      const generation = this.catalogGeneration;
-      const { models, defaults, agents, connected } = await PiBrowser.request('models');
-      if (generation !== this.catalogGeneration) return;
-      this.accountConnected = connected;
-      this.agentPicker.replaceChildren(...agents.map(agent => new Option(agent.name, agent.id)));
-      this.models = models;
-      this.defaults = defaults;
-      this.selectedSettings ||= defaults;
-      this.$('model').replaceChildren(...models.map(model => new Option(`${model.name || model.id} · ${model.provider}`, `${model.provider}/${model.id}`)));
-      this.renderActivity();
-    } catch (error) { this.error(error); }
-  }
-
-  optionLabel(value) { return ({ off: 'Off', default: 'Provider default', xhigh: 'Extra high' })[value] || (value ? value[0].toUpperCase() + value.slice(1) : ''); }
-
-  async changeModelSettings(values) {
-    if (!this.prepared) { await this.perform('model', values); return; }
-    if (this.pending) return;
-    this.pending = { action: 'model' };
-    this.error();
+  applyModelOptions({ models, defaults, agents, connected }) {
+    this.models = models;
+    this.defaults = defaults;
+    this.agents = agents;
+    this.accountConnected = connected;
+    this.$('agent-control').hidden = agents.length < 2;
+    this.$('agent').replaceChildren(...agents.map(agent => new Option(agent.name, agent.id)));
+    this.modelPicker.setOptions(models);
+    // Replace catalog metadata without changing the model the reader chose.
+    if (this.selectedSettings?.model) {
+      const updated = models.find(model => model.id === this.selectedSettings.model.id);
+      if (updated) this.selectedSettings = { ...this.selectedSettings, model: updated };
+    } else if (connected && defaults?.model) this.selectedSettings = defaults;
     this.renderActivity();
-    try { this.selectedSettings = await PiBrowser.request('modelDefaults', { settings: values.agentId ? values : { ...this.selectedSettings, ...values } }); }
-    catch (error) { this.error(error); }
-    finally { this.pending = null; this.renderActivity(); }
   }
 
-  error(error) { this.$('error').textContent = error?.message || ''; }
+  async previewModels() {
+    if (this.models) return;
+    const generation = this.catalogGeneration;
+    const options = await PiBrowser.request('modelPreview');
+    if (generation === this.catalogGeneration && !this.modelsConfirmed) this.applyModelOptions(options);
+  }
+
+  loadModels(reopen = false) {
+    if (this.modelsConfirmed && !reopen) return;
+    if (this.modelRequest) return this.modelRequest;
+    const generation = this.catalogGeneration;
+    const request = PiBrowser.request('models').then(options => {
+      if (generation !== this.catalogGeneration) return;
+      this.modelsConfirmed = true;
+      this.applyModelOptions(options);
+    }).catch(error => {
+      if (generation === this.catalogGeneration) this.error(error);
+    }).finally(() => { if (this.modelRequest === request) this.modelRequest = null; });
+    this.modelRequest = request;
+    return request;
+  }
+
+  changeModelSettings(values) {
+    if (!this.prepared) return this.perform('model', values);
+    const settings = values.agentId ? this.agents.find(agent => agent.id === values.agentId).defaults
+      : { ...(this.selectedSettings || this.defaults), ...values };
+    this.selectedSettings = MarginModelPreferences.normalize(settings);
+    this.error();
+    this.$('model-options').hidePopover();
+    this.renderActivity();
+  }
+
+  error(error) {
+    this.$('error').textContent = error?.message || '';
+    if (error?.code === 'MODEL_UNAVAILABLE') {
+      this.modelsConfirmed = false;
+      this.loadModels();
+    }
+  }
 
   async prepare(values, readBody) {
     this.renderSource(values.source);
     this.root.classList.add('new');
     const version = this.version;
     this.loadModels();
-    const identifier = await PiBrowser.request('identifier');
+    const [identifier] = await Promise.all([PiBrowser.request('identifier'), this.previewModels()]);
     if (version !== this.version) return;
     this.prepared = values;
     this.readBody = readBody;
@@ -237,7 +273,7 @@ class PiConversation {
     this.id = `draft:${identifier}`;
     this.$('draft').disabled = false;
     this.renderActivity();
-    await this.capabilities();
+    this.capabilities();
   }
 
   async discard() {
@@ -248,6 +284,7 @@ class PiConversation {
   }
 
   async show(sessionId) {
+    const reopen = !this.visible || this.id !== sessionId;
     this.visible = true;
     this.root.hidden = false;
     if (this.id !== sessionId) {
@@ -266,7 +303,10 @@ class PiConversation {
       this.error();
     }
     if (this.id !== sessionId) return;
-    await Promise.all([this.refresh(), this.capabilities(), this.loadModels()]);
+    this.capabilities();
+    this.previewModels().catch(error => this.error(error));
+    this.loadModels(reopen);
+    await this.refresh();
   }
 
   get hasInput() { return Boolean(this.$('draft').value) || this.images.length > 0 || Boolean(this.passage) || this.hasDictation; }
@@ -275,8 +315,13 @@ class PiConversation {
 
   get canContinue() { return ['cancelled', 'stopped'].includes(this.session?.status) && !this.hasTextDraft; }
 
+  get unavailableModel() {
+    const model = (this.session || this.selectedSettings)?.model;
+    return this.modelsConfirmed && this.accountConnected && model && !this.models.some(item => item.id === model.id) ? model : null;
+  }
+
   get canSend() {
-    return PiBrowser.available && Boolean(this.session || this.prepared) && !this.session?.busyElsewhere && !this.pending && !this.hasDictation
+    return PiBrowser.available && Boolean(this.session || this.prepared) && !this.session?.busyElsewhere && !this.pending && !this.hasDictation && !this.unavailableModel
       && (this.hasTextDraft || this.canContinue);
   }
 
@@ -361,9 +406,16 @@ class PiConversation {
   changed(event) {
     if (event.type === 'account-changed') {
       this.catalogGeneration = (this.catalogGeneration || 0) + 1;
-      this.models = undefined;
-      this.selectedSettings = undefined;
-      if (this.visible) this.loadModels();
+      this.models = this.modelRequest = this.defaults = undefined;
+      this.modelPicker.setOptions([]);
+      this.$('agent-control').hidden = true;
+      this.modelsConfirmed = false;
+      this.accountConnected = undefined;
+      this.renderActivity();
+      if (this.visible) {
+        this.previewModels().catch(error => this.error(error));
+        this.loadModels();
+      }
     }
     if (event.type === 'dictation-level' && event.sessionId === this.id && this.visible && this.voice.state === 'recording') this.renderWaveform(event.level);
     if (['message', 'interaction'].includes(event.type) && (event.change.sessionId === this.id || event.change.sessionIds?.includes(this.id))) this.refresh();
@@ -502,23 +554,26 @@ class PiConversation {
 
   async send(mode) {
     if (!this.canSend) return;
-    if (this.session?.status !== 'running' && !this.models) await this.loadModels();
-    if (!this.canSend || !this.models) return;
+    const input = this.input;
+    if (!this.modelsConfirmed && !this.models?.length) {
+      const version = this.version;
+      await this.loadModels();
+      if (!this.visible || this.version !== version || !this.matchesInput(input) || !this.canSend || !this.modelsConfirmed) return;
+    }
     if (this.session?.status !== 'running' && !this.models.length) {
-      if (this.accountConnected) { this.models = undefined; this.error(new Error('This account has no models supported by this build. Check plan access in ChatGPT and try again.')); return; }
+      if (this.accountConnected) { this.modelsConfirmed = false; this.error(new Error('This account has no models supported by this build. Check plan access in ChatGPT and try again.')); return; }
       try { await PiBrowser.request('connectAccount'); } catch (error) { this.error(error); }
       return;
     }
     if (this.session?.status === 'running') mode ||= 'steer';
     if (this.images.length && !this.modelCapabilities?.input?.includes('image')) { this.error(new Error('Choose a model that supports images before sending.')); return; }
-    const input = this.input;
     const text = input.text.trim() ? input.text : 'Continue from where you stopped.';
     if (this.prepared) {
       this.pending = { action: 'create' };
       this.renderActivity();
       try {
         const text = await this.readBody?.();
-        const session = await PiBrowser.request('create', { ...this.prepared, text, ...this.selectedSettings });
+        const session = await PiBrowser.request('create', { ...this.prepared, text, ...(this.selectedSettings || this.defaults) });
         this.id = session.id;
         this.session = session;
         this.prepared = null;
@@ -617,42 +672,54 @@ class PiConversation {
     const dictating = recording && this.voice.state !== 'error';
     const recovering = recording && this.voice.state === 'error';
     const settings = this.session || this.selectedSettings || this.defaults;
-    if (settings?.agentId) this.agentPicker.value = settings.agentId;
+    if (settings?.agentId) this.$('agent').value = settings.agentId;
     const model = settings?.model;
-    if (model && this.models) {
+    if (model) {
       const capability = this.modelCapabilities;
-      this.$('model').value = `${model.provider}/${model.id}`;
+      this.modelPicker.select(model.id, model.name);
+      this.$('model-control').hidden = this.modelPicker.trigger.hidden;
       this.$('model-name').textContent = model.name || model.id;
       const summary = [`${model.provider} / ${model.name || model.id}`];
       for (const [field, levels, label] of [['thinking', capability.thinkingLevels || ['off'], 'Reasoning'], ['tier', capability.speedTiers || [], 'Speed']]) {
         const control = this.$(field);
         const options = levels.join(',');
-        if (control.dataset.options !== options) {
-          control.replaceChildren(...levels.map(value => new Option(this.optionLabel(value), value)));
+        if (field === 'tier') control.checked = settings.tier === 'fast';
+        else if (control.dataset.options !== options) {
+          control.replaceChildren(...levels.map(value => new Option(MarginModelPreferences.label(value), value)));
           control.dataset.options = options;
         }
-        control.value = settings[field];
+        if (field === 'thinking') control.value = settings[field];
         const supported = field === 'thinking' ? levels.some(value => value !== 'off') : levels.length > 0;
-        this.$(`${field}-control`).hidden = !supported;
+        this.$(`${field}-control`).hidden = levels.length < 2;
         const indicator = this.$(`${field}-name`);
         indicator.hidden = !supported;
-        indicator.title = `${label}: ${this.optionLabel(settings[field])}`;
+        indicator.title = `${label}: ${MarginModelPreferences.label(settings[field])}`;
         if (supported) summary.push(indicator.title);
         control.title = label;
       }
-      const depth = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].indexOf(settings.thinking);
-      this.$('thinking-name').querySelectorAll('rect').forEach((bar, index) => bar.classList.toggle('active', index < depth));
+      const levels = (capability.thinkingLevels || []).filter(level => level !== 'off');
+      const bars = this.$('thinking-name').querySelectorAll('rect');
+      const depth = levels.length ? Math.ceil((levels.indexOf(settings.thinking) + 1) * bars.length / levels.length) : 0;
+      bars.forEach((bar, index) => bar.classList.toggle('active', index < depth));
       this.$('tier-name').dataset.fast = String(settings.tier === 'fast');
       this.$('model-summary').title = summary.join(' · ');
       this.$('model-summary').setAttribute('aria-label', `Model settings: ${summary.join(' · ')}`);
+    } else {
+      this.$('model-name').textContent = 'Model';
+      this.$('model-summary').title = 'Model settings';
+      this.$('model-summary').setAttribute('aria-label', 'Model settings');
+      this.$('thinking-name').hidden = this.$('tier-name').hidden = true;
     }
     for (const button of this.$('images').querySelectorAll('button')) button.disabled = Boolean(this.pending);
     this.$('add-image').disabled = !available || !this.id || Boolean(this.pending) || running || recording;
-    const disabled = !available || !this.models?.length || Boolean(this.pending) || running || this.session?.busyElsewhere || recording;
-    for (const field of ['model', 'thinking', 'tier']) this.$(field).disabled = disabled;
+    const editable = this.models?.length || (this.prepared && this.accountConnected == null && model);
+    const disabled = !available || !editable || Boolean(this.pending) || running || this.session?.busyElsewhere || recording;
+    for (const field of ['agent', 'thinking', 'tier']) this.$(field).disabled = disabled;
+    this.modelPicker.trigger.disabled = disabled || !this.models?.length;
+    const adjustable = ['agent-control', 'model-control', 'thinking-control', 'tier-control'].some(id => !this.$(id).hidden);
     this.$('model-settings').dataset.disabled = String(disabled);
-    this.$('model-summary').disabled = disabled;
-    if (running || recording) this.$('model-options').hidePopover();
+    this.$('model-summary').disabled = disabled || !adjustable;
+    if (disabled || !adjustable) this.$('model-options').hidePopover();
     else if (this.$('model-options').matches(':popover-open')) this.positionModelOptions();
     const composer = this.$('composer');
     if (composer.dataset.dictating !== String(dictating)) {
@@ -690,7 +757,11 @@ class PiConversation {
     const hint = running ? 'steer' : this.canContinue ? 'continue' : 'send';
     if (this.$('submit-hint').textContent !== hint) this.$('submit-hint').textContent = hint;
     this.$('queue-hint').hidden = !running;
-    this.$('status').textContent = this.pending ? ({ create: 'Starting conversation…', fork: 'Forking conversation…', send: running ? '' : 'Sending…', stop: '' }[this.pending.action]) : this.session?.error || this.session?.extensionError?.error || (this.session?.status === 'cancelled' ? 'Task stopped.' : '');
+    const unavailable = this.unavailableModel;
+    const modelNotice = unavailable && (this.models.length
+      ? `${unavailable.name || unavailable.id} is no longer available. Choose another model before sending.`
+      : 'This account has no available models supported by this build.');
+    this.$('status').textContent = modelNotice || (this.pending ? ({ create: 'Starting conversation…', fork: 'Forking conversation…', send: running ? '' : 'Sending…', stop: '' }[this.pending.action]) : this.session?.error || this.session?.extensionError?.error || (this.session?.status === 'cancelled' ? 'Task stopped.' : ''));
     const stoppingRecording = recording && this.voice.state === 'recording';
     this.$('voice').setAttribute('aria-label', stoppingRecording ? 'Stop recording' : 'Record');
     this.$('voice').title = stoppingRecording ? 'Stop recording' : 'Record';

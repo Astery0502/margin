@@ -239,6 +239,7 @@ class PiSourceDiscussions {
       return;
     }
     const path = event.composedPath();
+    if (event.key === 'Escape' && this.current?.view?.$('model-options').matches(':popover-open')) return;
     if (event.type === 'mousedown' && !this.options.containsSelection(path)) this.options.dismissSelection();
     if (event.key === 'Escape') this.options.dismissSelection();
     const marker = path.some(node => node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-pi-discussion-marker'));

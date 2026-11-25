@@ -1,23 +1,23 @@
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai/models';
-import { account } from './grant.js';
+import { account, cachedAccount } from './grant.js';
 
-let catalog, pending;
-export function invalidateModels() { pending = undefined; }
+let catalog;
 
-async function load() {
-  const connection = await account();
-  if (!connection) return { connected: false, models: [] };
+export function bundledModels() {
   catalog ??= fetch(chrome.runtime.getURL('providers/catalog.json')).then(r => r.json())
-    .then(items => new Map(items.map(item => [item.id, item]))).catch(error => { catalog = undefined; throw error; });
-  const byId = await catalog;
+    .then(items => new Map(items.map(model => [model.id, {
+      ...model, thinkingLevels: getSupportedThinkingLevels(model), speedTiers: ['default', 'fast'],
+    }]))).catch(error => { catalog = undefined; throw error; });
+  return catalog;
+}
+
+export async function modelCatalog(mode) {
+  const preview = mode === 'preview';
+  const connection = preview ? await cachedAccount() : await account(mode === 'refresh');
+  if (!connection) return { connected: preview ? null : false, models: [] };
+  const byId = await bundledModels();
   const models = connection.modelIds.map(id => byId.get(id)).filter(Boolean).map(model => ({
-    ...model, name: connection.names?.[model.id] || model.name, thinkingLevels: getSupportedThinkingLevels(model), speedTiers: ['default', 'fast'],
+    ...model, name: connection.names?.[model.id] || model.name,
   }));
   return { connected: true, models };
-}
-export function modelCatalog() {
-  if (pending) return pending;
-  const request = load().finally(() => { if (pending === request) pending = undefined; });
-  pending = request;
-  return request;
 }

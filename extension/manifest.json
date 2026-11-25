@@ -34,6 +34,7 @@
         "anchors.js",
         "client.js",
         "passage-ui.js",
+        "model-picker.js",
         "conversation.js",
         "image-capture.js",
         "discussion-host.js",

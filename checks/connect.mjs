@@ -190,7 +190,14 @@ try {
   await expect.poll(async () => (await detail()).status).toBe('cancelled');
   await expect(control.getByRole('button', { name: 'Continue with ChatGPT' })).toBeVisible();
   assert.ok(revoked);
-  // Reauthorize this saved identity, then check the resulting session across a restart.
+  // Login warms the directory even with no discussion view to request it.
+  await panel.close();
+  await page.close();
+  const previewIds = view => view.evaluate(async () => {
+    const reply = await chrome.runtime.sendMessage({ type: 'pi-sources', action: 'modelPreview' });
+    return reply.result.models.map(model => model.id);
+  });
+  assert.deepEqual(await previewIds(control), []);
   const relogin = consentOpening();
   await control.getByRole('button', { name: 'Continue with ChatGPT' }).click();
   const approved = await relogin;
@@ -198,11 +205,13 @@ try {
   assert.equal(pending.get('client_id'), clientId);
   await approved.goto(callback().href).catch(() => {});
   await expect(control.locator('#status')).toContainText('reader@example.test');
+  await expect.poll(() => previewIds(control)).toEqual(['gpt-6.1-sol']);
   await context.close();
   context = await launch();
   const settings = await context.newPage();
   await settings.goto(extensionOrigin + 'connect.html');
   await expect(settings.locator('#status')).toContainText('reader@example.test');
+  assert.deepEqual(await previewIds(settings), ['gpt-6.1-sol']);
   await settings.getByRole('button', { name: 'Disconnect account' }).click();
   await expect(settings.getByRole('button', { name: 'Continue with ChatGPT' })).toBeVisible();
   assert.ok(revoked);

@@ -9,21 +9,33 @@ import { chromium, expect } from '@playwright/test';
 const root = await mkdtemp(join(tmpdir(), 'margin-discussions-'));
 const extension = join(root, 'extension');
 const pdf = await readFile(new URL('./fixtures/sample.pdf', import.meta.url));
-const server = createServer((req, res) => {
+let modelIds = ['gpt-6.1-sol'], modelGate;
+const server = createServer(async (req, res) => {
+  if (req.url === '/models') {
+    await modelGate?.promise;
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ modelIds }));
+    return;
+  }
   if (req.url === '/sample.pdf') res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length }).end(pdf);
   else res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Example article</title><p>First passage on this page.</p><p>Second passage on this page.</p>');
 });
 let context, attached;
 try {
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = 'http://127.0.0.1:' + server.address().port;
   await cp('dist', extension, { recursive: true });
   await build({ entryPoints: ['extension/agents/worker.js', 'extension/background.js'], outbase: 'extension', outdir: extension, bundle: true, platform: 'browser', format: 'esm',
     plugins: [{ name: 'controlled-replies', setup(build) {
       build.onResolve({ filter: /providers\/stream\.js$/ }, () => ({ path: resolve('checks/fixtures/stream.js') }));
-      build.onResolve({ filter: /(?:^\.\/|providers\/)grant\.js$/ }, () => ({ path: 'grant', namespace: 'fixture' }));
-      build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "export async function accountGeneration() { return 1; } export async function account() { return { modelIds: ['gpt-6.1-sol'], accessToken: 'controlled' }; }" }));
+      build.onResolve({ filter: /(?:^\.\/|providers\/)native\.js$/ }, () => ({ path: 'native', namespace: 'fixture' }));
+      build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `
+        export const nativeHost = 'dev.margin.test_connect';
+        export const hostMissing = () => false;
+        export async function nativeRequest(op) {
+          if (op === 'status') return { connected: true, selected: 'reader', generation: 1 };
+          return { connected: true, ...(await (await fetch(${JSON.stringify(origin + '/models')})).json()) };
+        }` }));
     } }] });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = 'http://127.0.0.1:' + server.address().port;
   context = await chromium.launchPersistentContext(join(root, 'profile'), { headless: true, executablePath: process.env.BROWSER_BIN || '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     ignoreDefaultArgs: ['--disable-extensions'], args: ['--use-fake-device-for-media-stream', '--remote-debugging-port=0', '--disable-extensions-except=' + extension, '--load-extension=' + extension] });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
@@ -32,6 +44,8 @@ try {
   context.on('weberror', event => errors.push(event.error().message));
   const settings = await context.newPage();
   await settings.goto(new URL('options.html', worker.url()).href);
+  await expect(settings.locator('.model-field').getByText('GPT-6.1 Sol', { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(settings.getByRole('button', { name: /^Preferred model:/ })).toHaveCount(0);
   await settings.getByLabel('Read and write notes for this page').check();
   await settings.getByLabel('Delegate reading tasks on this page').check();
   await settings.getByText('Save agent settings').click();
@@ -63,7 +77,64 @@ try {
     await draft.press('Enter');
   }
 
+  async function expireListing() {
+    await settings.evaluate(async () => {
+      const { modelListing } = await chrome.storage.local.get('modelListing');
+      await chrome.storage.local.set({ modelListing: { ...modelListing, expires: 0 } });
+    });
+  }
+  const modelSummary = page.getByRole('button', { name: /^Model settings:/ });
+  const reasoning = page.getByRole('combobox', { name: 'Reasoning level' });
+  const chooseModel = page.getByRole('button', { name: /^Model:/ });
   const quickDraft = page.getByRole('textbox', { name: 'Discussion draft' });
+  modelIds.push('o3');
+  await settings.evaluate(() => chrome.storage.local.remove('modelListing'));
+  modelGate = Promise.withResolvers();
+  await openDraft(0, 'Quick');
+  await modelSummary.click();
+  await expect(chooseModel).toHaveCount(0);
+  await reasoning.selectOption('max');
+  await expect(modelSummary).toHaveAccessibleName(/Reasoning: Max/);
+  await expect(modelSummary.locator('.reasoning-bars rect.active')).toHaveCount(5);
+  await quickDraft.fill('Dismiss this question while the directory is loading');
+  await quickDraft.press('Enter');
+  await quickDraft.press('Escape');
+  modelGate.resolve();
+  await rpc('models');
+
+  // A catalog update must not move the keyboard highlight back to the saved model.
+  await expireListing();
+  modelGate = Promise.withResolvers();
+  await openDraft(0, 'Quick');
+  await modelSummary.click();
+  await chooseModel.click();
+  const modelList = page.getByRole('listbox', { name: 'Model', exact: true });
+  await modelList.press('End');
+  await expect(modelList).toHaveValue('o3');
+  modelIds.push('gpt-5', 'gpt-4.1', 'gpt-4.1-mini');
+  modelGate.resolve();
+  await expect(page.getByRole('searchbox', { name: 'Filter models' })).toBeVisible();
+  await modelList.press('Enter');
+  await expect(modelSummary).toHaveAccessibleName(/openai \/ o3/);
+  assert.deepEqual(await listed(), []);
+  await quickDraft.press('Escape');
+
+  // A cached choice remains editable while a refresh removes it.
+  await expireListing();
+  modelGate = Promise.withResolvers();
+  await openDraft(0, 'Quick');
+  await quickDraft.fill('Keep this draft');
+  await modelSummary.click();
+  await chooseModel.click();
+  await page.getByRole('option', { name: 'o3', exact: true }).click();
+  modelIds = ['gpt-6.1-sol', 'gpt-5'];
+  modelGate.resolve();
+  await expect(page.getByText(/o3 is no longer available/)).toBeVisible();
+  await expect(quickDraft).toHaveValue('Keep this draft');
+  await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+  await expect(modelSummary).toHaveAccessibleName(/openai \/ o3/);
+  await quickDraft.press('Escape');
+
   async function captureImage() {
     await page.getByRole('button', { name: 'Add image' }).click();
     await expect(page.getByRole('dialog', { name: 'Select image region' })).toBeVisible();
@@ -89,7 +160,25 @@ try {
     }, { expandedQuote: false, nextText: '', nextPassage: 'Second passage on this page.', showsAttachments: false });
     await quickDraft.press('Escape');
   }
+  // Select a model and edit its settings before the directory request can finish.
+  await expireListing();
+  modelGate = Promise.withResolvers();
   await openDraft(0, 'Quick');
+  await modelSummary.click();
+  await expect(page.getByRole('combobox', { name: 'Agent', exact: true })).toHaveCount(0);
+  await chooseModel.click();
+  await page.getByRole('option', { name: 'GPT-5', exact: true }).click();
+  await modelSummary.click();
+  assert.ok(await reasoning.evaluate(field => field.clientHeight <= parseFloat(getComputedStyle(field.parentElement).lineHeight) + 14),
+    'The reasoning value and its disclosure arrow should fit on one line.');
+  await reasoning.selectOption('low');
+  await expect(modelSummary).toHaveAccessibleName(/Reasoning: Low/);
+  await modelSummary.click();
+  await page.getByLabel('Fast mode').uncheck();
+  await expect(modelSummary).toHaveAccessibleName(/GPT-5.*Reasoning: Low.*Speed: Provider default/);
+  modelGate.resolve();
+  await rpc('models');
+  await modelSummary.click();
   const discussion = page.locator('.floating-dialog:visible');
   const beforeCapture = await discussion.boundingBox();
   await captureImage();
@@ -104,7 +193,12 @@ try {
   await quickDraft.press('Enter');
   await expect.poll(async () => (await listed())[0]?.status).toBe('completed');
   const photoDetail = await rpc('detail', { sessionId: (await listed())[0].id });
+  await assert.rejects(rpc('model', { sessionId: photoDetail.id, model: { id: 'unlisted-model' } }), /no longer available/);
+  assert.equal((await rpc('get', { sessionId: photoDetail.id })).model.id, 'gpt-5');
+  assert.equal(photoDetail.model.id, 'gpt-5');
   assert.equal(photoDetail.messages.find(message => message.role === 'user').presentation.passage.text, 'First passage on this page.');
+  assert.equal(photoDetail.thinking, 'low');
+  assert.equal(photoDetail.tier, 'default');
   assert.match(JSON.stringify(photoDetail.messages.at(-1)?.content), /equation/);
   await expect(page.locator('.katex')).toBeVisible();
   // Cancelling the region selector returns to the same input; dismissing the
@@ -237,6 +331,9 @@ try {
   assert.equal(JSON.parse(await readFile(exportedFile, 'utf8')).discussions.length, 2);
   await twin.close();
   // Use the same controlled runtime through the PDF reader and native side panel.
+  modelIds = ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-6.1-sol', 'gpt-4o-mini'];
+  await expireListing();
+  await rpc('models');
   const native = await context.newPage();
   await native.goto(origin + '/sample.pdf');
   const openingPdf = context.waitForEvent('page');
@@ -250,6 +347,20 @@ try {
   await reader.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: 'Full' }).click();
   const pdfDraft = reader.getByRole('textbox', { name: 'Discussion draft' });
   await pdfDraft.fill('A long response about the PDF');
+  const pdfSummary = reader.getByRole('button', { name: /^Model settings:/ });
+  await pdfSummary.click();
+  const models = reader.getByRole('button', { name: /^Model:/ });
+  await models.click();
+  const search = reader.getByRole('searchbox', { name: 'Filter models' });
+  await search.press('Escape');
+  await expect(models).toBeFocused();
+  await models.click();
+  await search.fill('GPT-4.1');
+  await reader.getByRole('option', { name: 'GPT-4.1', exact: true }).click();
+  await expect(pdfSummary).toHaveAccessibleName(/GPT-4.1/);
+  await expect(reader.getByLabel('Reasoning level')).toBeHidden();
+  await pdfSummary.click();
+  await expect(pdfDraft).toHaveValue('A long response about the PDF');
   await pdfDraft.press('Enter');
   await expect.poll(async () => (await listed())[0]?.status).toBe('running');
   const pdfId = (await listed())[0].id;
@@ -271,6 +382,7 @@ try {
   assert.deepEqual(errors, []);
   console.log('Controlled Agent streaming, cross-view stop, shared Full history, tools, page data and cleanup passed.');
 } finally {
+  modelGate?.resolve();
   await attached?.close();
   await context?.close();
   if (server.listening) await new Promise(resolve => server.close(resolve));
