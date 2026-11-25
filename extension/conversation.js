@@ -173,6 +173,11 @@ class PiConversation {
     });
     this.onFocus = () => { if (this.visible && !this.$('voice').hidden && !this.voiceReadiness?.ready) this.capabilities(); };
     window.addEventListener('focus', this.onFocus);
+    this.onVisibilityChange = () => {
+      if (document.hidden) clearTimeout(this.refreshTimer);
+      else if (this.visible && this.taskActive && PiBrowser.available) this.refresh();
+    };
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   positionModelOptions() {
@@ -314,6 +319,8 @@ class PiConversation {
 
   get hasTextDraft() { return Boolean(this.$('draft').value.trim()); }
 
+  get taskActive() { return this.session?.status === 'running' || Boolean(this.session?.busyElsewhere); }
+
   get canContinue() { return ['cancelled', 'stopped'].includes(this.session?.status) && !this.hasTextDraft; }
 
   get unavailableModel() {
@@ -371,17 +378,22 @@ class PiConversation {
 
   focusDraft() { this.$('draft').focus(); }
 
-  hide() { this.visible = false; this.root.hidden = true; }
+  hide() {
+    clearTimeout(this.refreshTimer);
+    this.visible = false;
+    this.root.hidden = true;
+  }
   dispose() {
     this.root.dispatchEvent(new Event('pi-conversation-disposed'));
     this.version++;
-    this.visible = false;
+    this.hide();
     this.id = null;
     this.inputs.clear();
     this.unsubscribe();
     this.unbindQuotes();
     this.draftObserver.disconnect();
     window.removeEventListener('focus', this.onFocus);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   invalidate() {
@@ -393,10 +405,11 @@ class PiConversation {
   async refresh() {
     const version = this.version;
     const sessionId = this.id;
+    clearTimeout(this.refreshTimer);
     if (!sessionId || this.prepared || !this.visible) return;
-    // Coalesce updates while Pi is returning a history snapshot.
-    if (this.loading === sessionId) { this.reload = true; return; }
-    this.loading = sessionId;
+    if (this.loadingVersion === version) { this.reload = true; return; }
+    this.loadingVersion = version;
+    this.reload = false;
     try {
       const session = await PiBrowser.request('detail', { sessionId, cursor: this.session?.cursor ?? null });
       if (version !== this.version) return;
@@ -409,8 +422,14 @@ class PiConversation {
       else this.error(error);
     }
     finally {
-      if (this.loading === sessionId) this.loading = null;
-      if (this.reload) { this.reload = false; this.refresh(); }
+      if (this.version === version) {
+        this.loadingVersion = null;
+        if (this.reload) this.refresh();
+        else if (this.visible && !document.hidden && PiBrowser.available && this.taskActive) {
+          // A missed task event must not leave an open discussion showing stale progress.
+          this.refreshTimer = setTimeout(() => this.refresh(), 2000);
+        }
+      }
     }
   }
 
@@ -682,7 +701,7 @@ class PiConversation {
     }
     const running = this.session?.status === 'running';
     const fork = this.actions.querySelector('[data-action="fork"]');
-    fork.disabled ||= running || this.session?.busyElsewhere || !this.session?.messages?.some(message => message.role === 'user');
+    fork.disabled ||= this.taskActive || !this.session?.messages?.some(message => message.role === 'user');
     const recording = this.hasDictation;
     const dictating = recording && this.voice.state !== 'error';
     const recovering = recording && this.voice.state === 'error';
@@ -728,7 +747,7 @@ class PiConversation {
     for (const button of this.$('images').querySelectorAll('button')) button.disabled = Boolean(this.pending);
     this.$('add-image').disabled = !available || !this.id || Boolean(this.pending) || running || recording;
     const editable = this.models?.length || (this.prepared && this.accountConnected == null && model);
-    const disabled = !available || !editable || Boolean(this.pending) || running || this.session?.busyElsewhere || recording;
+    const disabled = !available || !editable || Boolean(this.pending) || this.taskActive || recording;
     for (const field of ['agent', 'thinking', 'tier']) this.$(field).disabled = disabled;
     this.modelPicker.trigger.disabled = disabled || !this.models?.length;
     const adjustable = ['agent-control', 'model-control', 'thinking-control', 'tier-control'].some(id => !this.$(id).hidden);
@@ -763,7 +782,7 @@ class PiConversation {
       ? Boolean(this.pending && this.pending.action !== 'send')
       : !this.canSend);
     const waiting = Boolean(this.session?.interactionRequests?.length);
-    this.$('activity').hidden = !running && !this.session?.busyElsewhere;
+    this.$('activity').hidden = !this.taskActive;
     this.$('activity-spinner').hidden = waiting || this.session?.busyElsewhere;
     const activity = this.session?.busyElsewhere ? 'Another discussion on this document is running' : waiting ? 'Waiting for your answer…' : this.pending?.action === 'stop' ? 'Stopping…' : 'Working';
     if (this.$('activity-label').textContent !== activity) this.$('activity-label').textContent = activity;

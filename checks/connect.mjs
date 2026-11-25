@@ -2,7 +2,7 @@ import { copyTestExtension, launchTestExtension } from './fixtures/native-extens
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createServer as createTlsServer } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -129,6 +129,18 @@ try {
       '--ignore-certificate-errors-spki-list=' + spki],
   });
   await copyTestExtension(extension);
+  // Drop reader notifications in this fixture while leaving detail requests and the panel connected.
+  await appendFile(join(extension, 'client.js'), `{
+    const subscribe = PiBrowser.subscribe;
+    PiBrowser.subscribe = listener => subscribe(event => {
+      if (document.documentElement?.hasAttribute('data-miss-task-updates') &&
+          ['message', 'sessions', 'interaction'].includes(event.type)) {
+        if (event.type === 'sessions') document.documentElement.setAttribute('data-miss-task-updates', 'dropped');
+        return;
+      }
+      listener(event);
+    });
+  }`);
   context = await launch();
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   // Node URL treats the extension scheme as opaque.
@@ -152,6 +164,23 @@ try {
   await expect(upgrade.getByRole('link', { name: 'Download Margin Connect for Windows' })).toHaveAttribute('href', /Windows\.exe$/);
   await expect(upgrade.locator('#key')).toBeHidden();
   await upgrade.close();
+  const panel = await context.newPage();
+  await panel.goto(extensionOrigin + 'sidepanel.html');
+  // Close a real port on the background end, where its onDisconnect listener will not run.
+  const staleName = 'pi-sources/' + 'a'.repeat(32);
+  await worker.evaluate(name => chrome.runtime.onConnect.addListener(port => {
+    if (port.name !== name) return;
+    port.onMessage.addListener(() => port.disconnect());
+    port.postMessage('registered');
+  }), staleName);
+  const stale = await panel.evaluateHandle(name => {
+    const port = chrome.runtime.connect({ name });
+    const fixture = { port, registered: false, closed: false };
+    port.onMessage.addListener(message => { if (message === 'registered') fixture.registered = true; });
+    port.onDisconnect.addListener(() => { fixture.closed = true; });
+    return fixture;
+  }, staleName);
+  await expect.poll(() => stale.evaluate(fixture => fixture.registered)).toBe(true);
   const page = await context.newPage();
   await page.goto(fixture);
   await page.locator('body > p').evaluate(p => {
@@ -214,16 +243,26 @@ try {
   await expect(draft).toHaveValue('Keep my question.');
   assert.equal(calls, 0);
   await page.getByRole('button', { name: 'Send', exact: true }).click();
-  const panel = await context.newPage();
-  await panel.goto(extensionOrigin + 'sidepanel.html');
   const detail = async () => panel.evaluate(async () => {
     const [entry] = (await PiBrowser.request('browse')).sessions;
     return entry && PiBrowser.request('detail', { sessionId: entry.id });
   });
   await expect.poll(async () => { const entry = await detail(); if (entry?.error) throw new Error(entry.error); return JSON.stringify({ calls, status: entry?.status, messages: entry?.messages, error: entry?.error }); }).toContain('First passage');
   await expect(page.getByText('First passage', { exact: true })).toBeVisible();
+  await expect(page.locator('#activity')).toBeVisible();
+  await page.bringToFront();
+  await draft.fill('Unsent follow-up');
+  await stale.evaluate(fixture => fixture.port.postMessage('close'));
+  await expect.poll(() => stale.evaluate(fixture => fixture.closed)).toBe(true);
+  await page.evaluate(() => document.documentElement.setAttribute('data-miss-task-updates', ''));
   release();
-  await expect.poll(async () => JSON.stringify((await detail())?.messages)).toContain('First passage discussed.');
+  await expect.poll(async () => (await detail())?.status).toBe('completed');
+  assert.match(JSON.stringify((await detail()).messages), /First passage discussed\./);
+  await expect(page.locator('html')).toHaveAttribute('data-miss-task-updates', 'dropped');
+  await expect(page.locator('#activity')).toBeHidden();
+  await expect(page.getByText('First passage discussed.', { exact: true })).toBeVisible();
+  await expect(draft).toHaveValue('Unsent follow-up');
+  await page.evaluate(() => document.documentElement.removeAttribute('data-miss-task-updates'));
   assert.equal(refreshes, 1); assert.equal(calls, 1);
   // Exercise disconnection while another authorized stream is still open.
   const control = await context.newPage();

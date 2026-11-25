@@ -8,7 +8,7 @@ Dictation recognizes Mandarin Chinese and English automatically. You can use bot
 
 ## Install a GitHub build
 
-1. Download `Margin-Chromium.zip` from the [GitHub release assets](https://github.com/Astery0502/margin/releases/tag/v0.1.0-preview.3) and extract it to a folder you will keep.
+1. Download `Margin-Chromium.zip` from the [GitHub release assets](https://github.com/Astery0502/margin/releases/tag/v0.1.0-preview.4) and extract it to a folder you will keep.
 2. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge. Enable **Developer mode**, choose **Load unpacked**, and select the extracted `dist` folder containing `manifest.json`.
 3. Open a web page or PDF and select a passage to start a discussion. To send a question, use the connection page to install the bundled Margin Connect helper for macOS 14 or later, or 64-bit Windows.
 

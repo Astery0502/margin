@@ -21,7 +21,14 @@ let captureQueue = Promise.resolve();
 function notify(event) {
   for (const port of ports) {
     if (event.owner && event.owner !== viewOwner(port.sender, port.name.slice(11))) continue;
-    if (isPanel(port.sender) || senderSource(port.sender) === event.sourceId) port.postMessage(event);
+    if (event.type !== 'account-changed' && !isPanel(port.sender) && senderSource(port.sender) !== event.sourceId) continue;
+    try { port.postMessage(event); }
+    catch (error) {
+      // One failed delivery must not prevent the remaining views from receiving the event.
+      ports.delete(port);
+      port.disconnect();
+      console.warn('Margin view notification failed:', event.type, error.message);
+    }
   }
 }
 
@@ -216,7 +223,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     directory.invalidateAccount().then(() => {
       // Start warming the directory before the connect tab returns to the reader.
       directory.account().catch(console.error);
-      for (const port of ports) port.postMessage({ type: 'account-changed' });
+      notify({ type: 'account-changed' });
       respond({});
     }, error => respond({ error: error.message }));
     return true;
