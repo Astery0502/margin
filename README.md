@@ -4,7 +4,7 @@ Select a passage on a web page or PDF and open a Quick or Full discussion beside
 
 On macOS or 64-bit Windows, write your first question and choose **Connect an account to send**. Install **Margin Connect** for the current user, then authorize your ChatGPT subscription or enter a DeepSeek API key. DeepSeek bills usage to your API balance. Return to the passage and send your draft. Both connections can stay active. Choose a model in the discussion or set an agent’s preferred model in **Margin settings**. Manage each connection under **Accounts**.
 
-Dictation recognizes Mandarin Chinese and English automatically. You can use both in one recording. A short pause when switching languages can improve recognition. To use a fixed language, choose it under **Margin settings → Dictation → Spoken language**. Stop recording to add the transcript to your draft.
+Your first transcription downloads a speech model (about 44 MB) from Hugging Face. Margin verifies and caches it in your browser so later recordings can be transcribed offline. Recordings stay on your device. Dictation recognizes Mandarin Chinese and English automatically. You can use both in one recording. A short pause when switching languages can improve recognition. To use a fixed language, choose it under **Margin settings → Dictation → Spoken language**. Stop recording to add the transcript to your draft.
 
 ## Install a GitHub build
 
@@ -16,7 +16,7 @@ To upgrade from an earlier GitHub preview, replace the contents of your existing
 
 ## Build and load
 
-Use Node.js 22.19 or later, npm and curl.
+Use Node.js 22.19 or later and npm.
 
 ```sh
 npm ci
@@ -31,7 +31,7 @@ ditto -c -k --norsrc --noextattr --noqtn --keepParent dist dist-native/Margin-Ch
 
 Open the extensions page in Chromium, enable Developer mode, choose **Load unpacked** and select `dist/`. To read local files, enable **Allow access to file URLs** in the extension details and reload the file. Open a PDF in the browser and choose **Open PDF in Margin**.
 
-The first build downloads a pinned Whisper Tiny model and verifies its SHA-256 checksums. Later builds reuse the verified files in `.cache/whisper-tiny/`. The extension ships its PDF.js reader, Markdown and math renderer, speech engine and model data. Recordings are transcribed on the device.
+The extension ships its PDF.js reader, Markdown and math renderer, and speech engine. Only the Whisper Tiny model data is downloaded on demand.
 
 ## Margin Connect on macOS and Windows
 
@@ -65,7 +65,7 @@ Publishing the stable release triggers **Submit extension update** in GitHub Act
 
 ## Browser checks
 
-`npm run check` builds the extension and runs the floating-window, PDF, discussion, local-file and dictation checks. The full suite uses Microsoft Edge on macOS, isolated browser profiles and a synthesized test voice. The discussion check substitutes the account and model transport in a temporary copy of the extension. It exercises task execution, streaming, source cleanup and the native side panel without a live subscription.
+`npm run check` builds the extension and runs the floating-window, PDF, discussion, local-file and dictation checks. The full suite uses Microsoft Edge on macOS, isolated browser profiles and a synthesized test voice. The dictation check uses curl to populate its local model fixture on the first run. The discussion check substitutes the account and model transport in a temporary copy of the extension. It exercises task execution, streaming, source cleanup and the native side panel without a live subscription.
 
 After building, `npm run check:connect` uses a separate temporary Edge profile, signed fixture identity tokens and a local streaming server to exercise the connection UI, OAuth, refresh, revocation, DeepSeek key validation and model switching with both accounts connected. A separate live check on Apple Silicon verified ChatGPT authorization, streamed output in a Full PDF discussion, stopping from the side panel and locating the selected passage.
 

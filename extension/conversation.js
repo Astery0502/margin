@@ -817,6 +817,7 @@ class PiConversation {
     this.$('recording-status').textContent = dictating ? ({
       preparing: 'Checking voice setup…', permission: 'Allow microphone access in the extension tab.', requesting: 'Waiting for microphone access…',
       recording: `Recording ${elapsed}`,
+      downloading: 'Downloading speech model…',
       transcribing: 'Transcribing into this draft…', delivering: 'Adding text to your draft…',
     }[this.voice.state] || '') : '';
     this.$('voice-status').textContent = recovering ? `Recording kept. ${this.voice.error || 'Retry to add it to your draft.'}`

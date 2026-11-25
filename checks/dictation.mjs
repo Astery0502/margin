@@ -1,20 +1,41 @@
 import { copyTestExtension, launchTestExtension } from './fixtures/native-extension.mjs';
+import { prepareSpeechFixture } from './fixtures/speech-model.mjs';
+import model from '../extension/dictation/model.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rename, rm } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect } from '@playwright/test';
 
+const fixture = await prepareSpeechFixture();
 const temp = await mkdtemp(join(tmpdir(), 'margin-speech-'));
 const audio = join(temp, 'speech.wav');
 const extension = join(temp, 'extension');
-const model = join(extension, 'dictation/models/Xenova/whisper-tiny/onnx/encoder_model_quantized.onnx');
-const server = createServer((_req, res) => res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Reading</title><p>Discuss this passage in your own words.</p>'));
+const modelPath = '/' + model.repository + '/resolve/' + model.revision + '/';
+const requests = [];
+let corruptFile;
+let modelOffline = false;
+const server = createServer((req, res) => {
+  if (req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Reading</title><p>Discuss this passage in your own words.</p>');
+    return;
+  }
+  const file = req.url.slice(modelPath.length);
+  if (!req.url.startsWith(modelPath) || !Object.hasOwn(model.files, file)) return res.writeHead(404).end();
+  requests.push(file);
+  if (modelOffline) return res.writeHead(503).end();
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (file === corruptFile) return res.end('corrupted model data');
+  createReadStream(join(fixture, file)).on('error', error => res.destroy(error)).pipe(res);
+});
 try {
   await copyTestExtension(extension);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const workerPath = join(extension, 'dictation/transcriber.js');
+  await appendFile(workerPath, `\nenv.remoteHost = 'http://127.0.0.1:${server.address().port}/';\n`);
   await checkDictation({ voice: 'Tingting', speech: '今天天气很好，我们一起去公园散步。', expected: /今天|天[气氣]|公[园園]|散步/ });
   await checkDictation({ voice: 'Samantha', speech: 'This is a reading test. The book is on the table.', expected: /reading|book|table/i });
   await checkDictation({ voice: 'Tingting', speech: '今天天气很好。[[slnc 600]] The book is on the table.',
@@ -30,7 +51,9 @@ async function checkDictation({ voice, speech, expected, duration = 4600, langua
   try {
     execFileSync('say', ['-v', voice, '-o', join(temp, 'speech.aiff'), speech]);
     execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', '-c', '1', join(temp, 'speech.aiff'), audio]);
-    if (checkLifecycle) await rename(model, model + '.unavailable');
+    requests.length = 0;
+    corruptFile = checkLifecycle ? 'onnx/encoder_model_quantized.onnx' : undefined;
+    modelOffline = false;
     browser = await launchTestExtension(extension, {
       args: ['--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + audio],
     });
@@ -75,20 +98,33 @@ async function checkDictation({ voice, speech, expected, duration = 4600, langua
       await page.getByRole('button', { name: 'Return to recording draft' }).click();
     }
     await page.waitForTimeout(duration);
+    assert.equal(requests.length, 0, 'Model downloads start with the first transcription.');
     await page.getByRole('button', { name: 'Stop recording' }).click();
     if (checkLifecycle) {
       await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible({ timeout: 20000 });
       await page.getByRole('button', { name: 'Listen', exact: true }).click();
       await expect(page.locator('#voice-audio')).toHaveAttribute('src', /^data:audio/);
-      await rename(model + '.unavailable', model);
+      corruptFile = undefined;
       await page.getByRole('button', { name: 'Retry', exact: true }).click();
     }
     await expect(draft).toHaveValue(expected, { timeout: 90000 });
     const transcript = await draft.inputValue();
+    assert.deepEqual([...new Set(requests)].sort(), Object.keys(model.files).sort());
     if (checkLifecycle) {
+      assert.equal(requests.filter(file => file === 'onnx/decoder_model_merged_quantized.onnx').length, 1);
+      requests.length = 0;
+      modelOffline = true;
+      await draft.fill('Offline:');
+      await record.click();
+      await expect(page.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
+      await page.waitForTimeout(duration);
+      await page.getByRole('button', { name: 'Stop recording' }).click();
+      await expect(draft).toHaveValue(expected, { timeout: 90000 });
+      assert.equal(requests.length, 0, 'Cached dictation works without contacting the model host.');
+      const offlineTranscript = await draft.inputValue();
       await record.click();
       await page.getByRole('button', { name: 'Cancel dictation' }).click();
-      await expect(draft).toHaveValue(transcript);
+      await expect(draft).toHaveValue(offlineTranscript);
     }
     assert.match(transcript, /^Notes:/);
     console.log('Local dictation passed:', transcript);

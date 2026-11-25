@@ -1,12 +1,30 @@
 import { env, pipeline, SuppressTokensAtBeginLogitsProcessor } from './lib/transformers.min.js';
-const modelId = 'Xenova/whisper-tiny';
+import model from './model.json' with { type: 'json' };
 
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
 env.useBrowserCache = false;
-env.localModelPath = new URL('./models/', location.href).href;
+env.useCustomCache = true;
 env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.wasmPaths = new URL('./lib/', location.href).href;
+
+async function prepareModel() {
+  const cache = await caches.open('margin-dictation-model');
+  const base = new URL(model.repository + '/resolve/' + model.revision + '/', env.remoteHost);
+  env.customCache = cache;
+  const cached = new Set((await cache.keys()).map(request => request.url));
+  const missing = Object.entries(model.files).filter(([file]) => !cached.has(new URL(file, base).href));
+  if (!missing.length) return;
+  postMessage({ state: 'downloading' });
+  try {
+    for (const [file, integrity] of missing) {
+      await cache.add(new Request(new URL(file, base), { integrity, credentials: 'omit', cache: 'no-store' }));
+    }
+  } catch {
+    throw new Error('Could not download and save the verified speech model. Check your connection and available storage, then retry.');
+  }
+  postMessage({ state: 'transcribing' });
+}
 
 // Whisper predicts the language immediately after its start token. Let it choose
 // between the two language tokens, then complete the usual transcription prefix.
@@ -66,7 +84,10 @@ function* phrases(samples, sampleRate) {
 
 onmessage = async ({ data: { samples, language } }) => {
   try {
-    const recognize = await pipeline('automatic-speech-recognition', modelId, { device: 'wasm', dtype: 'q8', local_files_only: true });
+    await prepareModel();
+    const recognize = await pipeline('automatic-speech-recognition', model.repository, {
+      revision: model.revision, device: 'wasm', dtype: 'q8', local_files_only: true,
+    });
     const automatic = language === 'auto';
     const options = automatic ? bilingualOptions(recognize.model.generation_config) : { language };
     const segments = automatic ? phrases(samples, recognize.processor.feature_extractor.config.sampling_rate) : [samples];

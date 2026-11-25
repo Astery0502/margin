@@ -1,4 +1,3 @@
-import { copySpeechModel } from './speech-model.js';
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -53,7 +52,6 @@ async function assemble(destination, downloads) {
     await cp(resolve(speechLibrary, 'dist', asset), resolve(speechAssets, asset));
   }
   await cp(resolve(speechLibrary, 'LICENSE'), resolve(destination, 'LICENSE.transformers'));
-  await copySpeechModel(root, destination);
   await cp(resolve(root, 'third-party'), resolve(destination, 'licenses'), { recursive: true });
   for (const [name, license] of [['idb', 'LICENSE'], ['openai', 'LICENSE'], ['partial-json', 'LICENSE']]) {
     await cp(resolve(root, 'node_modules', name, license), resolve(destination, 'licenses', 'LICENSE.' + name));

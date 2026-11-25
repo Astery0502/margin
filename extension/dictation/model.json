@@ -1,0 +1,13 @@
+{
+  "repository": "Xenova/whisper-tiny",
+  "revision": "5332fcc35e32a33b86612b9a57a89be7906102b1",
+  "files": {
+    "config.json": "sha256-Ky5OUZCE4OoCixmxU/lSAnNalxhw1oRKom5Vnt0pLpQ=",
+    "generation_config.json": "sha256-aKx5H8tJmUYaMTRyElBCk0ZWJAuhy6fRwmJ/y7Gawkw=",
+    "onnx/decoder_model_merged_quantized.onnx": "sha256-bAwSWYawB9Ljc0vshMGL2gFSBxuQuH+trG13ZEmZJ6A=",
+    "onnx/encoder_model_quantized.onnx": "sha256-/Z2ZW53LBSDw2/bPaGUa9jn8OF9ZTZ2HbmnKKALcQ44=",
+    "preprocessor_config.json": "sha256-pqdtKMk+2yc2aeueCwY2or3bsScsMmHke3ym39usG40=",
+    "tokenizer.json": "sha256-J/xHa/5/FymUgL4ic/wGCOTVqZq6KrXexTdLRILRpWY=",
+    "tokenizer_config.json": "sha256-KkxCgc+fUaxszEBv3HEaCHr+ZTD2cfp7gJU+3EmCdc4="
+  }
+}

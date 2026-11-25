@@ -1,19 +1,19 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { cp, mkdir, readFile, rename, rm } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import lock from './speech-model.json' with { type: 'json' };
+import lock from '../../extension/dictation/model.json' with { type: 'json' };
 
 const run = promisify(execFile);
 async function digest(file) {
-  try { return createHash('sha256').update(await readFile(file)).digest('hex'); }
+  try { return 'sha256-' + createHash('sha256').update(await readFile(file)).digest('base64'); }
   catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
 
-export async function copySpeechModel(root, destination) {
+export async function prepareSpeechFixture() {
   for (const [file, expected] of Object.entries(lock.files)) {
-    const cache = resolve(root, '.cache/whisper-tiny', file);
+    const cache = resolve('.cache/whisper-tiny', file);
     if (await digest(cache) !== expected) {
       await mkdir(dirname(cache), { recursive: true });
       const temporary = cache + '.' + randomUUID();
@@ -24,8 +24,6 @@ export async function copySpeechModel(root, destination) {
         await rename(temporary, cache);
       } finally { await rm(temporary, { force: true }); }
     }
-    const output = resolve(destination, 'dictation/models', lock.repository, file);
-    await mkdir(dirname(output), { recursive: true });
-    await cp(cache, output);
   }
+  return resolve('.cache/whisper-tiny');
 }

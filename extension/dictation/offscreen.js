@@ -18,7 +18,12 @@ async function transcribe(blob, language, signal) {
       abort = () => reject(signal.reason);
       signal.addEventListener('abort', abort, { once: true });
       worker.onerror = event => reject(new Error(event.message || 'The speech model could not start.'));
-      worker.onmessage = ({ data }) => data.error ? reject(new Error(data.error)) : resolve(data);
+      worker.onmessage = ({ data }) => {
+        if (signal.aborted) return;
+        if (data.state) recorder.setState(data.state);
+        else if (data.error) reject(new Error(data.error));
+        else resolve(data);
+      };
       worker.postMessage({ samples, language }, [samples.buffer]);
     });
   } finally {
