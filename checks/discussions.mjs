@@ -154,10 +154,11 @@ try {
     else await page.mouse.click(8, 8);
     await expect(quickDraft).toBeHidden();
     await openDraft(1, 'Quick');
+    await expect(page.locator('#attached-quote').last()).toHaveText('Second passage on this page.');
     assert.deepEqual({
-      expandedQuote, nextText: await quickDraft.inputValue(), nextPassage: await page.locator('#quote').last().textContent(),
+      expandedQuote, nextText: await quickDraft.inputValue(),
       showsAttachments: await page.locator('#images').isVisible(),
-    }, { expandedQuote: false, nextText: '', nextPassage: 'Second passage on this page.', showsAttachments: false });
+    }, { expandedQuote: false, nextText: '', showsAttachments: false });
     await quickDraft.press('Escape');
   }
   // Select a model and edit its settings before the directory request can finish.
@@ -260,7 +261,8 @@ try {
   await expect(panel.getByRole('button', { name: 'Stop task' })).toBeEnabled();
   await panel.getByRole('button', { name: 'Stop task' }).click();
   await expect.poll(async () => (await listed())[0].status).toBe('cancelled');
-  await panel.getByRole('button', { name: 'Locate passage' }).first().click();
+  await expect(panel.locator('#source-card')).toBeHidden();
+  await panel.getByRole('button', { name: 'Locate passage', exact: true }).click();
   await expect(page.locator('body > p').first()).toBeInViewport();
 
   await context.grantPermissions(['microphone']);
@@ -297,8 +299,6 @@ try {
   await rpc('send', { sessionId: second.id, text: 'Please save a note' });
   await expect.poll(async () => (await rpc('storage', { sourceId: page.url() })).workingFiles).toBe(1);
   await expect.poll(async () => (await rpc('get', { sessionId: second.id })).status).toBe('completed');
-  await rpc('clearPageFiles', { sourceId: page.url() });
-  assert.equal((await rpc('storage', { sourceId: page.url() })).workingFiles, 0);
   await rpc('archivePage', { sourceId: page.url(), archived: true });
   assert.equal((await listed()).length, 0);
   await rpc('archivePage', { sourceId: page.url(), archived: false });
@@ -312,11 +312,64 @@ try {
   assert.notEqual(branch.sessionId, second.sessionId);
   assert.ok((await rpc('detail', { sessionId: branch.id })).messages.length);
   await rpc('deleteDiscussions', { sessionIds: [branch.id, (await listed()).find(item => item.parentId).id] });
-  await panel.getByRole('button', { name: 'List discussions' }).click();
-  await panel.getByRole('button', { name: 'All pages' }).click();
-  await panel.getByRole('button', { name: 'Manage page: Example article' }).click();
+  const panelDraft = panel.getByRole('textbox', { name: 'Discussion draft' });
+  const backToList = panel.getByRole('button', { name: 'Back to list' });
+  await panelDraft.fill('Keep this draft while browsing');
+  await panel.getByRole('button', { name: 'Archive', exact: true }).click();
+  const hint = panel.locator('#icon-hint');
+  const restore = panel.getByRole('button', { name: 'Restore', exact: true });
+  await restore.hover();
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveText('Restore');
+  await panel.keyboard.press('Escape');
+  await expect(hint).toBeHidden();
+  await restore.click();
+  await expect(panel.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled();
+  const readingSize = await panel.locator('#messages').evaluate(node => getComputedStyle(node).fontSize);
+  await backToList.click();
+  await expect(panelDraft).toBeHidden();
+  await expect(panel.getByRole('searchbox')).toBeHidden();
+  await expect(panel.getByRole('button', { name: 'Delete', exact: true })).toBeHidden();
+  const firstRow = panel.locator(`.discussion[data-session-id="${first}"]`);
+  await expect(firstRow).toBeVisible();
+  assert.equal(await firstRow.locator('.discussion-title').evaluate(node => getComputedStyle(node).fontSize), readingSize);
+  await panel.getByRole('button', { name: 'Search discussions' }).click();
+  const filter = panel.getByRole('searchbox', { name: 'Find discussions' });
+  await filter.fill('Example article');
+  await firstRow.locator('.discussion-open').click();
+  await expect(panelDraft).toHaveValue('Keep this draft while browsing');
+  await expect(filter).toBeHidden();
+  await backToList.click();
+  await expect(filter).toHaveValue('Example article');
+  await expect(firstRow.locator('.discussion-open')).toHaveAttribute('aria-current', 'true');
+  const locate = firstRow.getByRole('button', { name: 'Locate passage' });
+  await locate.hover();
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveText('Locate');
+  await locate.click();
+  await firstRow.getByRole('button', { name: 'Archive discussion' }).click();
+  await expect(firstRow).toBeHidden();
+  await panel.getByRole('button', { name: 'Include archived discussions' }).click();
+  await firstRow.getByRole('button', { name: 'Restore discussion' }).click();
+  await expect(firstRow.getByRole('button', { name: 'Archive discussion' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Select discussions' }).click();
+  await firstRow.getByRole('checkbox').check();
+  await expect(panel.locator('#selection-count')).toHaveText('1 selected');
+  await expect(panel.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Select all' }).click();
+  await expect(panel.locator('#selection-count')).toHaveText('2 selected');
+  await panel.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(firstRow.getByRole('checkbox')).toBeHidden();
+  await panel.getByRole('radio', { name: 'All', exact: true }).check();
+  await panel.getByRole('button', { name: 'Page summary: Example article' }).click();
+  const clearFiles = panel.getByRole('button', { name: 'Clear working files' });
+  panel.once('dialog', dialog => dialog.accept());
+  await clearFiles.click();
+  await expect(clearFiles).toBeHidden();
+  assert.equal((await rpc('storage', { sourceId: page.url() })).workingFiles, 0);
+  assert.equal((await listed()).length, 2);
   const downloading = panel.waitForEvent('download');
-  await panel.getByRole('button', { name: 'Export page discussions' }).click();
+  await panel.getByRole('button', { name: 'Export discussions' }).click();
   const download = await downloading;
   const exportedFile = join(root, 'discussions.json');
   await download.saveAs(exportedFile);
@@ -373,7 +426,8 @@ try {
   await reader.getByRole('button', { name: 'Rotate', exact: true }).click();
   await reader.locator('#page').fill('8');
   await reader.locator('#page').press('Tab');
-  await panel.getByRole('button', { name: 'Locate passage' }).first().click();
+  await panel.locator('#source-toggle').click();
+  await panel.getByRole('button', { name: 'Locate passage', exact: true }).click();
   await expect(reader.locator('#page')).toHaveValue('1');
   await native.close();
   await rpc('send', { sessionId: pdfId, text: 'A long response to interrupt' });

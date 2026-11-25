@@ -11,9 +11,19 @@ const composerIcons = {
 };
 
 const discussionActions = {
-  locateIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>',
-  get html() {
-    return `<button data-action="locate" type="button" aria-label="Locate passage" title="Locate passage">${this.locateIcon}</button><button data-action="fork" type="button" aria-label="Fork conversation" title="Fork conversation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v12a5 5 0 0 0 5 5h5M7 8h5a5 5 0 0 0 5-5"/></svg></button><button data-action="archive" type="button" aria-label="Archive" title="Archive"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8v12h14V8M3 4h18v4H3zM9 12h6"/></svg></button>`;
+  locateIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H4v4m12-4h4v4M4 17v4h4m12-4v4h-4M7 10h10M7 14h7"/></svg>',
+  archiveIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8v12h14V8M3 4h18v4H3zM9 12h6"/></svg>',
+  restoreIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v8h16v-8M3 9v3h5m8 0h5V9M12 15V3m-4 4 4-4 4 4"/></svg>',
+  forkIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v12a5 5 0 0 0 5 5h5M7 8h5a5 5 0 0 0 5-5"/></svg>',
+  buttons({ compactHints = false } = {}) {
+    return [
+      ['locate', 'Locate', 'Locate passage', this.locateIcon],
+      ['fork', 'Fork', 'Fork conversation', this.forkIcon],
+      ['archive', 'Archive', 'Archive', this.archiveIcon],
+    ].map(([action, hint, label, icon]) => {
+      const tooltip = compactHints ? `data-hint="${hint}"` : `title="${label}"`;
+      return `<button data-action="${action}" type="button" aria-label="${label}" ${tooltip}>${icon}</button>`;
+    }).join('');
   },
   get panelButton() {
     return '<button data-action="panel" type="button" aria-label="Open in side panel" title="Open in side panel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M6 12h6m-3-3 3 3-3 3"/></svg></button>';
@@ -24,7 +34,7 @@ const discussionActions = {
 const composerHeights = { initial: 32, initialLimit: 110, followup: 42, followupLimit: 220, messages: 70 };
 
 class PiConversation {
-  constructor(root, { inline = false, actions, title, captureImages = false } = {}) {
+  constructor(root, { inline = false, actions, onRender, captureImages = false } = {}) {
     this.root = root;
     this.inline = inline;
     this.shadow = root.attachShadow({ mode: 'open' });
@@ -41,18 +51,16 @@ class PiConversation {
       <style>
         ${PiMessages.styles}
         ${PiExtensionUI.styles}
-        ${discussionActions.styles}
-        :host{display:flex;flex-direction:column;min-height:0;flex:1;font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#2d4435}
+        :host{display:flex;flex-direction:column;min-height:0;flex:1;font:var(--margin-reading-size,13px)/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#2d4435}
         *{box-sizing:border-box}[hidden]{display:none!important}button,textarea,input{font:inherit}button{cursor:pointer;border:1px solid #d9e2d3;background:#f3f7ec;color:#426344;border-radius:7px;padding:6px 10px}button:disabled{opacity:.5;cursor:default}button:focus-visible,textarea:focus-visible{outline:2px solid #6b8f60;outline-offset:2px}
-        header{padding-bottom:10px;border-bottom:1px solid #dfe6d9}.heading{display:flex;align-items:start;gap:6px}h3{margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere;flex:1;min-width:0}.source-context{margin-top:5px;font-size:11px;color:#7a8d6c}.source-context summary{cursor:pointer;width:max-content}.source-context[open] summary{margin-bottom:6px}.origin{display:flex;gap:8px;align-items:start;margin-top:5px}.origin a{color:#6e8065;font-size:11px;overflow-wrap:anywhere;flex:1}blockquote{margin:10px 0;padding-left:10px;border-left:2px solid #bfceb1;font-size:12px;color:#6b7c60;max-height:85px;overflow:auto}
-        #messages{flex:1;min-height:${composerHeights.messages}px;overflow:auto;overscroll-behavior:contain;padding:10px 0}.message{padding:10px 0;border-bottom:1px solid #e7ebdf;overflow-wrap:anywhere}.speaker{font-size:10px;color:#7f9073;display:block;margin-bottom:4px}.message-body:not(.markdown){white-space:pre-wrap;margin:0}.empty{color:#829077;font-size:12px}summary{cursor:pointer}
-        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:11px;color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}
-        form{container-type:inline-size;flex-shrink:0;border:1px solid #d9e2d3;border-radius:10px;background:#f1f5eb;padding:8px;margin-top:8px}textarea{width:100%;display:block;min-height:${composerHeights.followup}px;max-height:${composerHeights.followupLimit}px;resize:none;border:0;background:transparent;color:#2d4435;line-height:1.6;padding:2px}.actions{display:flex;min-width:0;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}#send{background:#365d3e;border-color:#365d3e;color:#fff}#voice-recovery{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}#voice-recovery audio{width:100%;height:32px}#voice{font-size:11px}#cancel-voice{font-size:11px}.status{font-size:11px;color:#76866a;min-height:18px;margin:6px 0 0}#error{color:#a04c36;white-space:pre-wrap}.status:empty{display:none}
+        blockquote{margin:10px 0;padding-left:10px;border-left:2px solid #bfceb1;font-size:var(--margin-detail-size,12px);color:#6b7c60;max-height:85px;overflow:auto}
+        #messages{flex:1;min-height:${composerHeights.messages}px;overflow:auto;overscroll-behavior:contain;padding:10px 0}.message{padding:10px 0;border-bottom:1px solid #e7ebdf;overflow-wrap:anywhere}.speaker{font-size:var(--margin-detail-size,10px);color:#7f9073;display:block;margin-bottom:4px}.message-body:not(.markdown){white-space:pre-wrap;margin:0}.empty{color:#829077;font-size:var(--margin-detail-size,12px)}summary{cursor:pointer}
+        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:var(--margin-detail-size,11px);color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}
+        form{container-type:inline-size;flex-shrink:0;border:1px solid #d9e2d3;border-radius:10px;background:#f1f5eb;padding:8px;margin-top:8px}textarea{width:100%;display:block;min-height:${composerHeights.followup}px;max-height:${composerHeights.followupLimit}px;resize:none;border:0;background:transparent;color:#2d4435;line-height:1.6;padding:2px}.actions{display:flex;min-width:0;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}#send{background:#365d3e;border-color:#365d3e;color:#fff}#voice-recovery{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}#voice-recovery audio{width:100%;height:32px}#voice{font-size:var(--margin-detail-size,11px)}#cancel-voice{font-size:var(--margin-detail-size,11px)}.status{font-size:var(--margin-detail-size,11px);color:#76866a;min-height:18px;margin:6px 0 0}#error{color:#a04c36;white-space:pre-wrap}.status:empty{display:none}
         ${marginBrand.styles}
-        :host(.external-title) #header{display:flex;align-items:start;gap:8px}:host(.external-title) .source-context{flex:1;min-width:0;margin-top:0}
-        #draft-pi{display:none}#send,#voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#send[data-action="connect"]{width:auto;padding:3px 8px;font-size:11px}#send svg,#voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#voice[data-recording="true"] svg,#send[data-action="stop"] svg,#send[data-action="continue"] svg{fill:currentColor;stroke:none}
+        #draft-pi{display:none}#send,#voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#send[data-action="connect"]{width:auto;padding:3px 8px;font-size:var(--margin-detail-size,11px)}#send svg,#voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#voice[data-recording="true"] svg,#send[data-action="stop"] svg,#send[data-action="continue"] svg{fill:currentColor;stroke:none}
         #cancel-voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;border:0;background:transparent;flex:none}#cancel-voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
-        #recording-status{font-size:11px;color:#63765a;overflow-wrap:anywhere}
+        #recording-status{font-size:var(--margin-detail-size,11px);color:#63765a;overflow-wrap:anywhere}
         #voice-waveform{min-width:0;height:28px;color:#526c43}
         #voice-waveform svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
         #composer[data-dictating="true"] .actions{display:grid;grid-template-columns:auto fit-content(55%) minmax(0,1fr) auto;width:100%;margin:0}
@@ -66,16 +74,16 @@ class PiConversation {
         :host(.new.expanded) #composer{flex-direction:column;align-items:stretch;flex-wrap:nowrap}:host(.new.expanded) #draft-pi{display:none}:host(.new.expanded) textarea{min-width:0;flex-basis:auto}:host(.new.expanded) .actions{flex:none;width:100%;max-width:none;justify-content:flex-end}:host(.new.expanded) #attached-quote,:host(.new.expanded) #images{flex:none}
         #attached-quote{flex-basis:100%;width:100%;margin:0;max-height:65px;overflow:auto}
         :host(.new) #attached-quote{display:none}
-        #images{flex-basis:100%;min-width:0;font-size:12px;color:#526c43}
+        #images{flex-basis:100%;min-width:0;font-size:var(--margin-detail-size,12px);color:#526c43}
         #images summary{width:fit-content;cursor:pointer}
         #image-previews{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
         #images figure{margin:0;position:relative}
         #images img{display:block;max-width:110px;height:72px;object-fit:contain;border:1px solid #cbd8c0;border-radius:6px}
         #images button{position:absolute;right:0;top:0;padding:0;width:20px;height:20px;border-radius:4px;background:#fffef8}
         #add-image{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#add-image svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
-        #activity{display:flex;align-items:center;gap:7px;flex:none;min-height:20px;margin:6px 0;color:#6b805c;font-size:11px}#activity-spinner{width:11px;height:11px;border:1.5px solid #d9e2d3;border-top-color:currentColor;border-right-color:currentColor;border-radius:50%;animation:working 1.3s linear infinite}@keyframes working{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#activity-spinner{animation:none}}
-        #queued-inputs{flex:none;max-height:96px;overflow:auto;overscroll-behavior:contain;margin-top:8px}.queued-input{border-radius:8px;background:#f1f5eb;padding:8px 10px}.queued-input+.queued-input{margin-top:5px}.queued-label{display:block;font-size:11px;color:#76866a}.queued-text{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px}
-        #keyboard-hints{display:flex;flex:none;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:5px 0 0;font-size:11px;color:#76866a}kbd{font:inherit;color:#526c43}:host(:not(.new)) #model-settings{margin-right:auto}
+        #activity{display:flex;align-items:center;gap:7px;flex:none;min-height:20px;margin:6px 0;color:#6b805c;font-size:var(--margin-detail-size,11px)}#activity-spinner{width:11px;height:11px;border:1.5px solid #d9e2d3;border-top-color:currentColor;border-right-color:currentColor;border-radius:50%;animation:working 1.3s linear infinite}@keyframes working{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#activity-spinner{animation:none}}
+        #queued-inputs{flex:none;max-height:96px;overflow:auto;overscroll-behavior:contain;margin-top:8px}.queued-input{border-radius:8px;background:#f1f5eb;padding:8px 10px}.queued-input+.queued-input{margin-top:5px}.queued-label{display:block;font-size:var(--margin-detail-size,11px);color:#76866a}.queued-text{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:var(--margin-detail-size,12px)}
+        #keyboard-hints{display:flex;flex:none;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:5px 0 0;font-size:var(--margin-detail-size,11px);color:#76866a}kbd{font:inherit;color:#526c43}:host(:not(.new)) #model-settings{margin-right:auto}
         @container (max-width:330px){:host(.new) textarea{flex-basis:calc(100% - 32px);min-width:0}:host(.new) .actions{flex-basis:100%;max-width:100%}}
         ${inline ? ':host(.new) .actions{padding-right:12px}' : ''}
         .model-options {
@@ -91,7 +99,6 @@ class PiConversation {
         #model-picker { margin-top:3px; }
         #tier { vertical-align:middle; margin:0 5px 0 0; accent-color:#365d3e; }
       </style>
-      <header id="header"><div class="heading"><h3 id="title">Discussion</h3><div id="header-actions" class="discussion-actions">${discussionActions.html}</div></div><details class="source-context"><summary>Source</summary><div class="origin"><a id="origin" target="_blank" rel="noreferrer"></a></div><blockquote id="quote"></blockquote></details></header>
       <div id="extension-requests" aria-live="polite"></div><div id="messages" aria-live="polite"></div>
       <div id="activity" role="status" hidden><span id="activity-spinner" aria-hidden="true"></span><span id="activity-label">Working</span></div>
       <div id="queued-inputs" aria-label="Pending messages" aria-live="polite" hidden></div>
@@ -103,13 +110,8 @@ class PiConversation {
     this.$('add-image').hidden = !captureImages;
     this.$('images').addEventListener('toggle', () => this.renderImagePreviews());
     this.$('add-image').addEventListener('click', () => this.root.dispatchEvent(new Event('pi-conversation-images')));
-    this.title = title || this.$('title');
-    this.$('header').hidden = inline;
-    this.actions = actions || this.$('header-actions');
-    if (title) {
-      root.classList.add('external-title');
-      this.$('header').append(this.actions);
-    }
+    this.onRender = onRender;
+    this.actions = actions;
     this.actions.addEventListener('click', event => {
       if (!this.session || this.pending) return;
       const action = event.target.closest('button')?.dataset.action;
@@ -261,7 +263,6 @@ class PiConversation {
   }
 
   async prepare(values, readBody) {
-    this.renderSource(values.source);
     this.root.classList.add('new');
     const version = this.version;
     this.loadModels();
@@ -350,7 +351,7 @@ class PiConversation {
     const minimum = initial ? composerHeights.initial : composerHeights.followup;
     let maximum = composerHeights.initialLimit;
     if (!initial) {
-      const surroundingHeight = ['header', 'extension-requests', 'activity', 'queued-inputs', 'keyboard-hints', 'status', 'voice-status', 'voice-recovery', 'error']
+      const surroundingHeight = ['extension-requests', 'activity', 'queued-inputs', 'keyboard-hints', 'status', 'voice-status', 'voice-recovery', 'error']
         .reduce((height, id) => {
           const element = this.$(id);
           if (!element.offsetHeight) return height;
@@ -371,7 +372,17 @@ class PiConversation {
   focusDraft() { this.$('draft').focus(); }
 
   hide() { this.visible = false; this.root.hidden = true; }
-  dispose() { this.root.dispatchEvent(new Event('pi-conversation-disposed')); this.version++; this.visible = false; this.unsubscribe(); this.unbindQuotes(); this.draftObserver.disconnect(); window.removeEventListener('focus', this.onFocus); }
+  dispose() {
+    this.root.dispatchEvent(new Event('pi-conversation-disposed'));
+    this.version++;
+    this.visible = false;
+    this.id = null;
+    this.inputs.clear();
+    this.unsubscribe();
+    this.unbindQuotes();
+    this.draftObserver.disconnect();
+    window.removeEventListener('focus', this.onFocus);
+  }
 
   invalidate() {
     this.version++; this.id = null; this.session = null; this.prepared = null;
@@ -468,7 +479,9 @@ class PiConversation {
   }
 
   canReceiveDictation(sessionId) {
-    const ownsInput = sessionId === this.id ? (this.visible || this.prepared) : this.visible && this.inputs.has(sessionId);
+    // The side panel still owns its drafts while the reader browses the list.
+    const acceptsInput = this.visible || !this.inline;
+    const ownsInput = sessionId === this.id ? (acceptsInput || this.prepared) : acceptsInput && this.inputs.has(sessionId);
     return sessionId && ownsInput && !this.$('voice').hidden && !(sessionId === this.id && this.pending?.action === 'panel');
   }
 
@@ -478,8 +491,11 @@ class PiConversation {
     if (!this.canReceiveDictation(sessionId)) return Promise.resolve();
     const receipt = (async () => {
       // Apply an in-flight side-panel handoff before consuming its recording result.
-      if (!this.inline) this.acceptInput(sessionId, await PiBrowser.request('panelInput', { sessionId }));
-      if (!this.canReceiveDictation(sessionId)) return;
+      if (!this.inline) {
+        const input = await PiBrowser.request('panelInput', { sessionId });
+        if (!this.canReceiveDictation(sessionId)) return;
+        this.acceptInput(sessionId, input);
+      }
       const result = await PiBrowser.voice('take', sessionId);
       if (!result || !this.canReceiveDictation(sessionId)) return;
       const input = sessionId === this.id ? this.input : this.inputs.get(sessionId);
@@ -641,8 +657,7 @@ class PiConversation {
     const session = this.session;
     this.extensionUI.render(this.id, session.interactionRequests);
     this.root.classList.toggle('new', this.inline && session.status === 'idle' && !session.messages?.some(message => message.role === 'user'));
-    this.title.textContent = session.title;
-    this.renderSource(session.source);
+    this.onRender?.(session);
     const list = this.$('messages');
     const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 40;
     PiMessages.update(list, session.messages || [], { showContext: false });
@@ -651,20 +666,20 @@ class PiConversation {
     this.renderActivity();
   }
 
-  renderSource(source) {
-    this.$('header').hidden = this.inline;
-    this.shadow.querySelector('.heading').hidden = this.inline || this.title !== this.$('title');
-    this.$('origin').textContent = `${source.title} · ${new URL(source.url).hostname}`;
-    this.$('origin').href = source.citationUrl || source.url;
-    this.$('quote').textContent = source.selection;
-  }
-
   renderActivity() {
     const available = PiBrowser.available;
-    for (const button of this.actions.querySelectorAll('button')) button.disabled = !available || !this.session || Boolean(this.pending);
+    for (const button of this.actions.querySelectorAll('button[data-action]')) button.disabled = !available || !this.session || Boolean(this.pending);
     const archive = this.actions.querySelector('[data-action="archive"]');
-    archive.title = this.session?.archived ? 'Restore' : 'Archive';
-    archive.setAttribute('aria-label', archive.title);
+    if (archive) {
+      if (archive.dataset.archived !== String(Boolean(this.session?.archived))) {
+        archive.dataset.archived = String(Boolean(this.session?.archived));
+        const label = this.session?.archived ? 'Restore' : 'Archive';
+        archive.setAttribute('aria-label', label);
+        if (archive.hasAttribute('data-hint')) archive.dataset.hint = label;
+        else archive.title = label;
+        archive.innerHTML = this.session?.archived ? discussionActions.restoreIcon : discussionActions.archiveIcon;
+      }
+    }
     const running = this.session?.status === 'running';
     const fork = this.actions.querySelector('[data-action="fork"]');
     fork.disabled ||= running || this.session?.busyElsewhere || !this.session?.messages?.some(message => message.role === 'user');

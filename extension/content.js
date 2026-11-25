@@ -65,7 +65,7 @@
         </style>
         <button id="launcher" aria-label="Quick" aria-controls="body" aria-expanded="false" hidden>${quickIcon}</button>
         <section class="floating-dialog" role="dialog" aria-labelledby="label">
-          <div id="bar"><button id="toggle" aria-expanded="false" aria-controls="body"><span id="pi">${marginBrand.icon}</span><span id="label"></span></button><div id="card-actions" class="discussion-actions">${discussionActions.html}${discussionActions.panelButton}</div></div>
+          <div id="bar"><button id="toggle" aria-expanded="false" aria-controls="body"><span id="pi">${marginBrand.icon}</span><span id="label"></span></button><div id="card-actions" class="discussion-actions">${discussionActions.buttons()}${discussionActions.panelButton}</div></div>
           <div id="body" hidden></div>
         </section>`;
       const section = mark.querySelector('section');

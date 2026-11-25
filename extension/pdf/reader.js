@@ -32,7 +32,7 @@ function createFrame() {
   const section = discussionTemplate.cloneNode(true);
   const element = id => section.querySelector(`#${id}`);
   element('discussion-mark').innerHTML = marginBrand.icon;
-  element('discussion-actions').innerHTML = discussionActions.html + discussionActions.panelButton;
+  element('discussion-actions').innerHTML = discussionActions.buttons() + discussionActions.panelButton;
   return {
     section, handle: element('discussion-handle'), root: element('conversation'), actions: element('discussion-actions'),
     contains: path => path.includes(section),

@@ -79,9 +79,13 @@ export async function createDiscussion({ source, includeFullText, text, settings
   return summary(item, run);
 }
 
+function readBySource(store, sourceId) {
+  return sourceId ? store.index('source').getAll(sourceId) : store.getAll();
+}
+
 export async function list(sourceId) {
   const tx = (await database).transaction(['discussions', 'executions']);
-  const read = name => sourceId ? tx.objectStore(name).index('source').getAll(sourceId) : tx.objectStore(name).getAll();
+  const read = name => readBySource(tx.objectStore(name), sourceId);
   const [items, runs] = await Promise.all([read('discussions'), read('executions')]);
   const byId = new Map(runs.map(run => [run.id, run]));
   return items.map(item => summary(item, byId.get(item.executionId)));
@@ -118,20 +122,37 @@ export async function detail(id, cursor) {
   return { ...summary(item, run), messages, messageOffset: offset, cursor: count };
 }
 
-function matches(item, { archived, query = '' }) {
-  return (archived || !item.archived) && [item.title, item.source.title].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase());
+function matchingDiscussions(items, { archived, query = '' }) {
+  const search = query.toLocaleLowerCase();
+  return items.filter(item => (archived || !item.archived) &&
+    (!search || [item.title, item.source.title].join(' ').toLocaleLowerCase().includes(search)));
+}
+
+export async function matchingDiscussionIds(filter) {
+  const store = (await database).transaction('discussions').store;
+  const items = await readBySource(store, filter.sourceId);
+  return matchingDiscussions(items, filter).map(item => item.id);
 }
 
 export async function browse(filter) {
-  const items = (await list(filter.sourceId)).filter(item => matches(item, filter)).sort((a, b) => b.createdAt - a.createdAt);
+  const tx = (await database).transaction(['discussions', 'executions']);
+  const items = matchingDiscussions(await readBySource(tx.objectStore('discussions'), filter.sourceId), filter);
+  const sourceCounts = Object.create(null);
+  for (const item of items) sourceCounts[item.sourceId] = (sourceCounts[item.sourceId] || 0) + 1;
+  items.sort((a, b) => b.createdAt - a.createdAt);
   const start = Math.max(0, filter.offset || 0);
   const end = start + Math.min(100, Math.max(1, filter.limit || 50));
-  const sessions = items.slice(start, end);
-  for (const item of sessions) {
+  const page = items.slice(start, end);
+  const runs = new Map();
+  for (const item of page) {
+    if (!runs.has(item.executionId)) runs.set(item.executionId, tx.objectStore('executions').get(item.executionId));
+  }
+  const sessions = await Promise.all(page.map(async item => {
     item.source.selection = item.source.selection.slice(0, 180);
     delete item.source.location;
-  }
-  return { sessions, total: items.length, nextOffset: end < items.length ? end : null };
+    return summary(item, await runs.get(item.executionId));
+  }));
+  return { sessions, sourceCounts, total: items.length, nextOffset: end < items.length ? end : null };
 }
 
 export async function edit(id, changes) {
@@ -172,9 +193,9 @@ export async function remove({ sourceId, sessionIds, wholePage, closing, ...filt
   if (wholePage && !sourceId) throw new Error('Choose a source page first.');
   const tx = (await database).transaction(stores, 'readwrite');
   const discussions = tx.objectStore('discussions');
-  let items = sourceId ? await discussions.index('source').getAll(sourceId) : await discussions.getAll();
+  let items = await readBySource(discussions, sourceId);
   const selected = sessionIds && new Set(sessionIds);
-  if (!wholePage) items = items.filter(item => selected ? selected.has(item.id) : matches(item, filter));
+  if (!wholePage) items = selected ? items.filter(item => selected.has(item.id)) : matchingDiscussions(items, filter);
   const executions = tx.objectStore('executions');
   const runs = await Promise.all([...new Set(items.map(item => item.executionId))].map(id => executions.get(id)));
   if (!closing && runs.some(run => run.status === 'running')) throw new Error('Stop active tasks before deleting discussions.');

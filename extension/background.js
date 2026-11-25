@@ -90,7 +90,7 @@ async function handle(action, values, sender, owner) {
   }
   await resumed;
   await storageReady;
-  if (['browse', 'snapshot', 'activate', 'panelInput', 'storage', 'archivePage', 'clearPageFiles', 'deleteDiscussions', 'deletePage', 'exportPage'].includes(action) && !isPanel(sender)) throw new Error('Open the side panel to browse discussions.');
+  if (['browse', 'matchingDiscussionIds', 'snapshot', 'activate', 'panelInput', 'storage', 'archivePage', 'clearPageFiles', 'deleteDiscussions', 'deletePage', 'exportPage'].includes(action) && !isPanel(sender)) throw new Error('Open the side panel to browse discussions.');
   const sourceId = senderSource(sender);
   if (['list', 'prepareDiscussion'].includes(action) && (!sourceId || sourceId !== (values.sourceId || values.source?.id))) throw new Error('The source page has changed.');
   if (['storage', 'archivePage', 'clearPageFiles', 'exportPage', 'deletePage'].includes(action) && !sourceUrl(values.sourceId)) throw new Error('Choose a source page first.');
@@ -146,6 +146,7 @@ async function handle(action, values, sender, owner) {
     case 'inputDiscard': return discardVoice(sourceId, [values.sessionId]);
     case 'settings': return chrome.runtime.openOptionsPage();
     case 'browse': return store.browse(values);
+    case 'matchingDiscussionIds': return store.matchingDiscussionIds(values);
     case 'storage': return store.storage(values.sourceId);
     case 'exportPage': return store.exportPage(values.sourceId);
     case 'clearPageFiles': return store.clearFiles(values.sourceId);
