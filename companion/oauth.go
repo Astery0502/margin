@@ -53,7 +53,7 @@ func (p provider) token(ctx context.Context, form url.Values) (tokenReply, error
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := p.client.Do(req)
 	if err != nil {
-		return t, errors.New("Could not reach OpenAI to authorize this account.")
+		return t, connectionError(err, "Could not reach OpenAI to authorize this account.")
 	}
 	defer res.Body.Close()
 	decoder := json.NewDecoder(io.LimitReader(res.Body, 1<<20))
@@ -202,7 +202,7 @@ func (p provider) login(ctx context.Context, accountID string, send func(any) er
 	ctx = oidc.ClientContext(ctx, p.client)
 	discovery, err := oidc.NewProvider(ctx, p.issuer)
 	if err != nil {
-		return errors.New("Could not verify OpenAI's sign-in configuration.")
+		return connectionError(err, "Could not verify OpenAI's sign-in configuration.")
 	}
 	identity, err := discovery.Verifier(&oidc.Config{ClientID: issued}).Verify(ctx, t.ID)
 	if err != nil || identity.Nonce != nonce || identity.Subject == "" || (previous.Subject != "" && identity.Subject != previous.Subject) {

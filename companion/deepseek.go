@@ -80,7 +80,7 @@ func (p provider) deepseek(ctx context.Context, cmd command, send func(any) erro
 	}
 	res, err := p.client.Do(req)
 	if err != nil {
-		return errors.New("Margin Connect could not reach DeepSeek.")
+		return connectionError(err, "Margin Connect could not reach DeepSeek.")
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {

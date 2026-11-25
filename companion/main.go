@@ -108,7 +108,7 @@ func (p provider) api(ctx context.Context, cmd command, send func(any) error) er
 	}
 	res, err := p.client.Do(req)
 	if err != nil {
-		return errors.New("Margin Connect could not reach OpenAI.")
+		return connectionError(err, "Margin Connect could not reach OpenAI.")
 	}
 	defer res.Body.Close()
 	if res.StatusCode == 401 {
@@ -222,7 +222,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{Transport: newSystemProxyTransport(systemProxy), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	p := provider{issuer, resource, client, vault{filepath.Join(support, "Margin", "Connect")}}
 	if len(os.Args) == 1 || strings.HasPrefix(os.Args[1], "-psn_") {
 		setupWindow(support)
