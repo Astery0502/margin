@@ -1,9 +1,14 @@
 import { offscreenCommand } from '../agents/runtime.js';
+import { dictationLanguage } from './language.js';
 
 const permissionPage = chrome.runtime.getURL('dictation/permission.html');
 const permissionLock = operation => navigator.locks.request('margin-microphone-permission', operation);
 const getRequest = async () => (await chrome.storage.session.get('microphoneRequest')).microphoneRequest;
-const command = (data, start = false) => offscreenCommand('voice-command', data, { start });
+async function command(data) {
+  const start = data.action === 'start';
+  if (start) data.language = await dictationLanguage();
+  return offscreenCommand('voice-command', data, { start });
+}
 const idle = () => ({ state: 'idle', sessionId: null });
 
 async function clearRequest(pending, close) {
@@ -26,7 +31,7 @@ export async function voice(action, sessionId, sourceId, sender, recordingId, no
           notify({ type: 'dictation', ...idle(), owner: pending.owner, sourceId: pending.sourceId });
           return idle();
         }
-        try { return await command({ action, sessionId, sourceId: pending.sourceId, owner: pending.owner }, true); }
+        try { return await command({ action, sessionId, sourceId: pending.sourceId, owner: pending.owner }); }
         catch (error) {
           notify({ type: 'dictation', ...idle(), sessionId, owner: pending.owner, sourceId: pending.sourceId, error: error.message });
           throw error;
@@ -41,7 +46,7 @@ export async function voice(action, sessionId, sourceId, sender, recordingId, no
         await chrome.tabs.update(pending.tabId, { active: true });
         return { state: 'permission', sessionId };
       }
-      const result = await command({ action, sessionId, sourceId, owner }, action === 'start');
+      const result = await command({ action, sessionId, sourceId, owner });
       if (!result?.permissionRequired) return result || idle();
       const tab = await chrome.tabs.create({ url: permissionPage + '?sessionId=' + encodeURIComponent(sessionId) });
       await chrome.storage.session.set({ microphoneRequest: { tabId: tab.id, sessionId, sourceId, owner } });

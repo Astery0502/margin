@@ -7,7 +7,7 @@ function notify(event) {
   if (target) chrome.runtime.sendMessage({ type: 'voice-event', event: { ...event, sourceId: target.sourceId, owner: target.owner } }).catch(console.error);
 }
 
-async function transcribe(blob, signal) {
+async function transcribe(blob, language, signal) {
   const audio = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await blob.arrayBuffer());
   signal.throwIfAborted();
   const samples = audio.getChannelData(0).slice();
@@ -19,7 +19,7 @@ async function transcribe(blob, signal) {
       signal.addEventListener('abort', abort, { once: true });
       worker.onerror = event => reject(new Error(event.message || 'The speech model could not start.'));
       worker.onmessage = ({ data }) => data.error ? reject(new Error(data.error)) : resolve(data);
-      worker.postMessage(samples, [samples.buffer]);
+      worker.postMessage({ samples, language }, [samples.buffer]);
     });
   } finally {
     worker.terminate();
@@ -29,7 +29,7 @@ async function transcribe(blob, signal) {
 
 const recorder = new DictationRecorder({
   prepare: async () => {}, deliver: async () => {},
-  request: (_action, task, { audio }) => transcribe(audio, task.controller.signal),
+  request: (_action, task, { audio }) => transcribe(audio, target.language, task.controller.signal),
   onState(value, sessionId, details) {
     state = { state: value, sessionId, ...details };
     notify({ type: 'dictation', ...state });
@@ -45,7 +45,7 @@ const recorder = new DictationRecorder({
   onLevel(level, sessionId) { notify({ type: 'dictation-level', level, sessionId }); },
 });
 
-async function operate({ action, sessionId, sourceId, ids, owner, fromOwner, recordingId }) {
+async function operate({ action, sessionId, sourceId, ids, owner, fromOwner, recordingId, language }) {
   if (action === 'discard') {
     const matches = (id, source) => source === sourceId && (!ids || ids.includes(id));
     for (const [id, result] of results) if (matches(id, result.sourceId)) results.delete(id);
@@ -73,7 +73,7 @@ async function operate({ action, sessionId, sourceId, ids, owner, fromOwner, rec
     const permission = await navigator.permissions.query({ name: 'microphone' });
     if (permission.state !== 'granted') return { permissionRequired: true };
     if (recorder.task) throw new Error('Finish the current recording first.');
-    target = { sessionId, sourceId, owner };
+    target = { sessionId, sourceId, owner, language };
     await recorder.start(sessionId);
   } else if (target?.sourceId !== sourceId || target?.sessionId !== sessionId || target?.owner !== owner) {
     if (action === 'status') return { state: 'idle', sessionId: null };
