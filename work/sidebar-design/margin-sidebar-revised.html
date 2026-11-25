@@ -1,0 +1,86 @@
+<div class="viz-dotted-background" id="margin-reading-panel">
+<style>
+#margin-reading-panel{display:grid;place-items:center;padding:12px 0}
+#margin-reading-panel .panel{color-scheme:light dark;--paper:light-dark(#fcfdf8,#21271f);--ink:light-dark(#31432e,#e3ecdb);--soft:light-dark(#5b6e55,#b7c5ac);--line:light-dark(#dbe3d4,#485542);--tint:light-dark(#eaf0e2,#374530);--sel:light-dark(#d7e7cb,#495d3d);width:min(100%,356px);height:435px;display:flex;flex-direction:column;overflow:hidden;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;position:relative}
+#margin-reading-panel .panel *{box-sizing:border-box}
+#margin-reading-panel .bar,#margin-reading-panel .group,#margin-reading-panel .row,#margin-reading-panel .inputrow{display:flex;align-items:center;gap:2px}
+#margin-reading-panel .bar{min-height:44px;padding:4px 8px;border-bottom:1px solid var(--line)}
+#margin-reading-panel button,#margin-reading-panel select{display:inline-flex;align-items:center;justify-content:center;gap:4px;background:transparent;color:inherit;border:0;border-radius:6px;padding:5px;font:inherit;cursor:pointer}
+#margin-reading-panel button:hover,#margin-reading-panel select:hover{background:var(--tint)}
+#margin-reading-panel button[aria-pressed=true]{background:var(--sel)}
+#margin-reading-panel .bar button,#margin-reading-panel select{font-size:14px;min-height:32px}
+#margin-reading-panel select{padding:3px 0;max-width:99px}
+#margin-reading-panel .panel svg{width:17px;height:17px;flex:none;stroke-width:1.7}
+#margin-reading-panel .grow{flex:1;min-width:0}
+#margin-reading-panel .body{flex:1;min-height:0;overflow:auto;padding:0 12px}
+#margin-reading-panel .group{padding:9px 0 6px;border-bottom:1px solid var(--line);color:var(--soft);font-size:13px}
+#margin-reading-panel .row{border-bottom:1px solid var(--line);padding:4px 0}
+#margin-reading-panel .row.current{background:var(--tint)}
+#margin-reading-panel .entry{min-width:0;flex:1;display:block;text-align:left;padding:5px}
+#margin-reading-panel .entry span,#margin-reading-panel .entry small,#margin-reading-panel .cut{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#margin-reading-panel .entry span,#margin-reading-panel .threadtitle{font-size:15px;font-weight:500}
+#margin-reading-panel .entry small,#margin-reading-panel .small{font-size:13px;color:var(--soft)}
+#margin-reading-panel .row .icon{width:30px;height:34px;color:var(--soft)}
+#margin-reading-panel .threadtitle{justify-content:flex-start}
+#margin-reading-panel .groupcard,#margin-reading-panel .source{padding:10px 8px;background:var(--tint);border-radius:6px}
+#margin-reading-panel .meta{display:flex;justify-content:space-between;align-items:center;margin:3px 0;font-size:13px}
+#margin-reading-panel .link{font-size:13px;text-decoration:underline;text-underline-offset:2px}
+#margin-reading-panel .prompt{width:fit-content;background:var(--tint);border-radius:10px 10px 3px 10px;margin:16px 0 14px auto;padding:8px 12px}
+#margin-reading-panel .composer{margin:10px 12px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;color:var(--soft)}
+#margin-reading-panel textarea,#margin-reading-panel input[type=search]{background:var(--paper);color:var(--ink);border:0;width:100%;font:inherit}#margin-reading-panel textarea{resize:none;height:30px}
+#margin-reading-panel .inputrow{justify-content:flex-end}
+#margin-reading-panel .search{padding:5px 12px;border-bottom:1px solid var(--line)}
+#margin-reading-panel .body p{margin:12px 0}#margin-reading-panel mark{background:var(--sel);color:inherit}
+#margin-reading-panel [hidden]{display:none!important}
+</style>
+<div class="panel" lang="en" aria-label="Margin side panel preview">
+<div class="bar" id="mr-nav"></div>
+<div class="search" hidden><input type="search" aria-label="Find discussions" placeholder="Find discussions"></div>
+<div class="body" aria-live="polite"></div>
+<div class="composer" hidden><textarea rows="1" aria-label="Discussion draft" placeholder="Ask about this passage…"></textarea><div class="inputrow" aria-hidden="true"><i data-lucide="mic"></i><i data-lucide="arrow-up"></i></div></div>
+</div></div>
+<script>
+(()=>{
+const root=document.getElementById('margin-reading-panel'), nav=root.querySelector('.bar'), body=root.querySelector('.body'), composer=root.querySelector('.composer'), draft=root.querySelector('textarea'), search=root.querySelector('.search'), query=search.querySelector('input');
+const pages=['The Shape of a Footnote','Reading in the Margins'];
+const items=[
+['Reading in two places','A note asks us to hold a place in two texts at once.','What do we have to remember?','Where we left the sentence, and which words sent us to the note. A short note makes the return trip easier.',0],
+['A note beside the text','In the margin, the note stays in sight.','How does placement help?','The note stays beside the line it explains, so you can look back without turning a page.',0],
+['When a citation is enough','Sometimes the reference itself is the whole note.','When is a short citation enough?','When the reader just needs to identify the source.',0],
+['Endnotes and distance','At the back of the book, the notes stand apart.','What changes with endnotes?','They keep the page quiet but make each reference a longer trip.',0],
+['The second reading','The pencilled line records a first reading.','Why keep the mark?','It gives you a point of comparison when you return to the text.',1]];
+let view='list',active=0,scope='page',arch=false,selecting=false,searching=false,info=-1,source=false,files=3,confirmClear=false,returnView='list',settingsFrom='list';
+const archived=new Set([3]),checked=new Set(),removed=new Set(),drafts=new Map();
+function el(t,c='',txt=''){const n=document.createElement(t);n.className=c;n.textContent=txt;return n}
+function icon(name){const n=el('i');n.dataset.lucide=name;n.setAttribute('aria-hidden','true');return n}
+function btn(name,label,fn,cls=''){const n=el('button',cls);n.type='button';n.setAttribute('aria-label',label);n.dataset.tooltip=label;if(name)n.append(icon(name));else n.textContent=label;n.onclick=fn;return n}
+function spacer(){return el('span','grow')}
+function save(){window.openai?.setWidgetState?.({modelContent:{view,scope,includeArchived:arch},privateContent:{active}})?.catch(()=>{})}
+function draw(){nav.replaceChildren();body.replaceChildren();search.hidden=view!=='list'||!searching||selecting;composer.hidden=view!=='thread';
+if(view==='list'){
+const shown=items.map((_,i)=>i).filter(i=>!removed.has(i)&&(arch||!archived.has(i))&&(scope==='all'||items[i][4]===0)&&items[i][0].toLowerCase().includes(query.value.toLowerCase()));
+if(selecting){nav.append(btn(null,'Select all',()=>{shown.forEach(i=>checked.add(i));draw()}),el('span','grow small',checked.size+' selected'));const del=btn(null,'Delete',()=>{if(checked.size){view='delete';draw()}});del.disabled=!checked.size;nav.append(del,btn(null,'Done',()=>{selecting=false;checked.clear();draw()}))}
+else{const sel=el('select');sel.setAttribute('aria-label','Discussion scope');sel.append(new Option('This page','page'),new Option('All pages','all'));sel.value=scope;sel.onchange=()=>{scope=sel.value;info=-1;draw();save()};const a=btn(null,'Include archived discussions',()=>{arch=!arch;draw();save()});a.textContent='Archived';a.setAttribute('aria-pressed',String(arch));const m=btn(null,'Select discussions',()=>{selecting=true;draw()});m.textContent='Select';
+nav.append(sel,spacer(),btn('search','Search discussions',()=>{searching=!searching;if(!searching)query.value='';draw();if(searching)query.focus()}),a,m,settings())}
+for(const page of (scope==='page'?[0]:[0,1])){const rows=shown.filter(i=>items[i][4]===page);if(!rows.length)continue;const g=el('div','group');g.append(el('span','grow cut',pages[page]),el('span','',String(rows.length)),btn('info','Page summary',()=>{info=info===page?-1:page;confirmClear=false;draw()}));body.append(g);
+if(info===page){const box=el('div','groupcard');const count=page===0?files:0;for(const [k,v] of [['History','48 KB'],['Saved text','12 KB'],['Working files',count?count+' · 18 KB':'0 · 0 KB']]){const line=el('div','meta');line.append(el('span','',k),el('span','',v));box.append(line)}
+if(count){if(confirmClear){box.append(el('div','small','Clear 3 working files? Discussions and saved text are kept.'),btn(null,'Cancel',()=>{confirmClear=false;draw()}),btn(null,'Clear files',()=>{files=0;confirmClear=false;draw()}))}else box.append(btn(null,'Clear working files',()=>{confirmClear=true;draw()},'link'))}
+const link=el('a','link','Export discussions');link.download='example-discussions.json';link.href='data:application/json,'+encodeURIComponent(JSON.stringify(items.filter((it,i)=>it[4]===page&&!removed.has(i)).map(it=>({title:it[0],passage:it[1],question:it[2],answer:it[3]})),null,2));box.append(document.createElement('br'),link);body.append(box)}
+for(const i of rows){const row=el('div','row'+(i===active?' current':''));const entry=el('button','entry');entry.append(el('span','',items[i][0]),el('small','',(archived.has(i)?'Archived · ':'')+'“'+items[i][1]+'”'));entry.onclick=()=>{if(selecting){checked.has(i)?checked.delete(i):checked.add(i)}else{active=i;view='thread';source=false;draft.value=drafts.get(i)||''}draw();save()};
+if(selecting){const c=el('input');c.type='checkbox';c.checked=checked.has(i);c.setAttribute('aria-label','Select '+items[i][0]);c.onchange=()=>entry.click();row.append(c)}row.append(entry);
+if(!selecting){row.append(btn('scan-text','Locate passage',()=>{active=i;returnView='list';view='original';draw()},'icon'),btn(archived.has(i)?'archive-restore':'archive',archived.has(i)?'Restore discussion':'Archive discussion',()=>{archived.has(i)?archived.delete(i):archived.add(i);draw()},'icon'))}body.append(row)}}
+if(!shown.length)body.append(el('p','small','No matching discussions.'));
+}else if(view==='thread'){const item=items[active];const title=btn(null,'View source passage',()=>{source=!source;draw()},'threadtitle grow');title.replaceChildren(el('span','cut',item[0]),icon('chevron-down'));title.setAttribute('aria-expanded',String(source));
+nav.append(btn('arrow-left','Back to list',()=>{drafts.set(active,draft.value);view='list';draw();save()}),title,btn('git-fork','Fork conversation',()=>{const copy=[...item];copy[0]=item[0]+' (fork)';items.push(copy);drafts.set(active,draft.value);active=items.length-1;draft.value='';source=false;draw()}),settings());
+if(source){const card=el('div','source');card.append(el('span','small',pages[item[4]]),el('p','','“'+item[1]+'”'),btn('scan-text','Locate passage',()=>{returnView='thread';view='original';draw()},'icon'));body.append(card)}body.append(el('div','prompt',item[2]),el('p','',item[3]));
+}else if(view==='original'){nav.append(btn('arrow-left','Back',()=>{view=returnView;draw()}),el('span','grow cut',pages[items[active][4]]));const p=el('p');p.append(el('mark','',items[active][1]));body.append(p)}
+else if(view==='settings'){nav.append(btn('arrow-left','Back',()=>{view=settingsFrom;draw()}),el('span','','Margin settings'));for(const t of ['Account','Agents','Dictation'])body.append(el('p','',t))}
+else if(view==='delete'){body.append(el('p','','Delete '+checked.size+' selected discussions?'),btn(null,'Cancel',()=>{view='list';draw()}),btn(null,'Delete discussions',()=>{checked.forEach(i=>removed.add(i));checked.clear();selecting=false;view='list';draw()}))}
+globalThis.lucide?.createIcons({attrs:{width:17,height:17}});
+}
+function settings(){return btn('settings','Margin settings',()=>{settingsFrom=view;view='settings';draw()})}
+query.oninput=draw;
+function restore(s){if(s){const m=s.modelContent||{},p=s.privateContent||{};if(['list','thread'].includes(m.view))view=m.view;if(['all','page'].includes(m.scope))scope=m.scope;if(typeof m.includeArchived==='boolean')arch=m.includeArchived;if(Number.isInteger(p.active)&&items[p.active])active=p.active;}draw()}
+restore(window.openai?.widgetState);window.addEventListener('openai:set_globals',e=>{if(e.detail?.globals?.widgetState)restore(e.detail.globals.widgetState)});
+})();
+</script>
