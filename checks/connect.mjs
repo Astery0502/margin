@@ -17,7 +17,7 @@ const availableModels = ['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6.1-terra'];
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: 'jwk' }), alg: 'RS256', kid: 'fixture' };
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-let invalidNonce = true, streamClosed = false;
+let denyToken = true, invalidNonce = true, streamClosed = false;
 let pending, calls = 0, refreshes = 0, revoked = false, release, failure;
 let context, consentServer;
 const server = createServer(async (req, res) => {
@@ -42,6 +42,10 @@ const server = createServer(async (req, res) => {
         assert.equal(form.get('code'), 'fixture-code');
         assert.equal(form.get('redirect_uri'), pending.get('redirect_uri'));
         assert.equal(createHash('sha256').update(form.get('code_verifier')).digest('base64url'), pending.get('code_challenge'));
+        if (denyToken) {
+          res.writeHead(403, { 'Content-Type': 'text/html' });
+          return res.flushHeaders(); // The helper can report the refusal before the body arrives.
+        }
         const header = encode({ alg: 'RS256', kid: jwk.kid });
         const claims = encode({ iss: issuer, aud: clientId, sub: 'reader', email: 'reader@example.test', exp: Math.floor(Date.now()/1000)+300, nonce: invalidNonce ? 'wrong-attempt' : pending.get('nonce') });
         const data = header + '.' + claims;
@@ -190,15 +194,22 @@ try {
   wrongState.searchParams.set('state', 'unrelated-attempt');
   assert.equal((await fetch(wrongState)).status, 400);
   await consent.goto(callback().href).catch(() => {});
+  await expect(setup.locator('#status')).toHaveText('The OpenAI token endpoint returned HTTP 403.');
+  await expect(draft).toHaveValue('Keep my question.');
+  denyToken = false;
+  async function approveSavedClient(view) {
+    const opening = consentOpening();
+    await view.getByRole('button', { name: 'Continue with ChatGPT' }).click();
+    const tab = await opening;
+    await expect(tab).toHaveTitle('Fixture consent');
+    assert.equal(pending.get('client_id'), clientId);
+    await tab.goto(callback().href).catch(() => {});
+  }
+  await approveSavedClient(setup);
   await expect(setup.locator('#status')).toContainText('could not be verified');
   assert.equal(calls, 0);
   invalidNonce = false;
-  const retry = consentOpening();
-  await setup.getByRole('button', { name: 'Continue with ChatGPT' }).click();
-  const returning = await retry;
-  await expect(returning).toHaveTitle('Fixture consent');
-  assert.equal(pending.get('client_id'), clientId);
-  await returning.goto(callback().href).catch(() => {});
+  await approveSavedClient(setup);
   await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
   await expect(draft).toHaveValue('Keep my question.');
   assert.equal(calls, 0);
@@ -260,12 +271,7 @@ try {
     return reply.result.models.map(model => model.id);
   });
   assert.deepEqual(await previewIds(control), []);
-  const relogin = consentOpening();
-  await control.getByRole('button', { name: 'Continue with ChatGPT' }).click();
-  const approved = await relogin;
-  await expect(approved).toHaveTitle('Fixture consent');
-  assert.equal(pending.get('client_id'), clientId);
-  await approved.goto(callback().href).catch(() => {});
+  await approveSavedClient(control);
   await expect(control.locator('#status')).toContainText('reader@example.test');
   await expect.poll(() => previewIds(control)).toEqual(availableModels);
   await connectKey('fixture-deepseek');

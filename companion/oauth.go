@@ -56,16 +56,25 @@ func (p provider) token(ctx context.Context, form url.Values) (tokenReply, error
 		return t, errors.New("Could not reach OpenAI to authorize this account.")
 	}
 	defer res.Body.Close()
-	if json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&t) != nil {
-		return t, errors.New("OpenAI returned an unreadable authorization response.")
+	decoder := json.NewDecoder(io.LimitReader(res.Body, 1<<20))
+	switch res.StatusCode {
+	case http.StatusOK:
+		if decoder.Decode(&t) != nil {
+			return t, errors.New("OpenAI returned an unreadable authorization response.")
+		}
+		if t.Access == "" || t.Expires <= 0 || !strings.EqualFold(t.Type, "Bearer") {
+			return t, errors.New("OpenAI did not issue a usable access token.")
+		}
+		return t, nil
+	case http.StatusBadRequest, http.StatusUnauthorized:
+		if decoder.Decode(&t) == nil {
+			switch t.Error {
+			case "invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused":
+				return t, invalidGrant
+			}
+		}
 	}
-	if slices.Contains(strings.Fields("invalid_grant invalid_refresh_token token_expired refresh_token_expired refresh_token_invalidated refresh_token_reused"), t.Error) {
-		return t, invalidGrant
-	}
-	if res.StatusCode != 200 || t.Access == "" || t.Expires <= 0 || !strings.EqualFold(t.Type, "Bearer") {
-		return t, errors.New("OpenAI did not issue a usable access token.")
-	}
-	return t, nil
+	return t, &providerHTTPError{res.StatusCode, fmt.Sprintf("The OpenAI token endpoint returned HTTP %d.", res.StatusCode)}
 }
 func (t tokenReply) session(previous *session) (*session, error) {
 	if previous != nil {
