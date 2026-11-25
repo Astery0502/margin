@@ -13,6 +13,7 @@ const root = await mkdtemp(join(tmpdir(), 'margin-connect-check-'));
 const extension = join(root,'extension');
 const issuer = 'https://auth.openai.com';
 const clientId = 'oaiapp_fixture';
+const availableModels = ['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6.1-terra'];
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: 'jwk' }), alg: 'RS256', kid: 'fixture' };
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -49,10 +50,11 @@ const server = createServer(async (req, res) => {
       }
       case '/v1/models':
         assert.equal(req.headers.authorization, 'Bearer renewed');
-        return json({ models: [{ slug: 'gpt-6.1-sol', display_name: 'Subscription model', visibility: 'list' }] });
+        return json({ models: availableModels.map(slug => ({ slug, visibility: 'list' })) });
       case '/v1/responses': {
         assert.equal(req.headers.authorization, 'Bearer renewed');
         const payload = JSON.parse(body);
+        assert.equal(payload.model, 'gpt-6.2-sol');
         assert.equal(payload.stream, true); assert.equal(payload.store, false);
         assert.match(JSON.stringify(payload.input), /Keep my question/);
         assert.ok(!('background' in payload) && !('max_output_tokens' in payload));
@@ -205,13 +207,13 @@ try {
   assert.equal(pending.get('client_id'), clientId);
   await approved.goto(callback().href).catch(() => {});
   await expect(control.locator('#status')).toContainText('reader@example.test');
-  await expect.poll(() => previewIds(control)).toEqual(['gpt-6.1-sol']);
+  await expect.poll(() => previewIds(control)).toEqual(availableModels);
   await context.close();
   context = await launch();
   const settings = await context.newPage();
   await settings.goto(extensionOrigin + 'connect.html');
   await expect(settings.locator('#status')).toContainText('reader@example.test');
-  assert.deepEqual(await previewIds(settings), ['gpt-6.1-sol']);
+  assert.deepEqual(await previewIds(settings), availableModels);
   await settings.getByRole('button', { name: 'Disconnect account' }).click();
   await expect(settings.getByRole('button', { name: 'Continue with ChatGPT' })).toBeVisible();
   assert.ok(revoked);

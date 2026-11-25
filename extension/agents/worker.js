@@ -1,5 +1,5 @@
 import { Agent } from '@earendil-works/pi-agent-core';
-import { Type } from '@earendil-works/pi-ai';
+import { obj, oneOf, opt, str } from '@earendil-works/pi-schema';
 import { streamReply } from '../providers/stream.js';
 import * as store from '../discussions/store.js';
 
@@ -31,7 +31,7 @@ function toolsFor(task, enabled) {
   const result = [];
   if (enabled.includes('ask')) result.push({
     name: 'ask_reader', executionMode: 'sequential', label: 'Ask the reader', description: 'Ask the reader for clarification and wait for their reply.',
-    parameters: Type.Object({ question: Type.String() }),
+    parameters: obj({ question: str() }),
     async execute(id, { question }, signal) {
       signal.throwIfAborted();
       let finish;
@@ -57,7 +57,7 @@ function toolsFor(task, enabled) {
     for (const write of [false, true]) result.push({
       name: write ? 'write_page_note' : 'read_page_note', label: write ? 'Save a page note' : 'Read a page note',
       description: write ? 'Save a named text note for the current source.' : 'Read a named text note for the current source.',
-      parameters: Type.Object(write ? { name: Type.String(), text: Type.String() } : { name: Type.String() }),
+      parameters: obj(write ? { name: str(), text: str() } : { name: str() }),
       async execute(_id, { name, text }, signal) {
         signal.throwIfAborted();
         return textResult(await store.pageFile(task.run.sourceId, name, write ? text : undefined));
@@ -67,7 +67,7 @@ function toolsFor(task, enabled) {
   if (enabled.includes('delegate')) {
     result.push({
       name: 'delegate', label: 'Delegate a reading task', description: 'Start a separate reading task on this source. Returns its discussion ID.',
-      parameters: Type.Object({ task: Type.String() }),
+      parameters: obj({ task: str() }),
       async execute(_id, { task: question }, signal) {
         signal.throwIfAborted();
         if (closing.has(task.run.sourceId)) throw new Error('The source page is closing.');
@@ -78,7 +78,7 @@ function toolsFor(task, enabled) {
       },
     }, {
       name: 'delegated_task', label: 'Manage a delegated task', description: 'Inspect, wait for, continue, or stop a direct child discussion.',
-      parameters: Type.Object({ id: Type.String(), action: Type.Union(['inspect', 'wait', 'continue', 'stop'].map(value => Type.Literal(value))), text: Type.Optional(Type.String()) }),
+      parameters: obj({ id: str(), action: oneOf(['inspect', 'wait', 'continue', 'stop']), text: opt(str()) }),
       async execute(_id, { id, action, text }, signal) {
         signal.throwIfAborted();
         const { run } = await store.lookup(id);

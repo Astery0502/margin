@@ -4,7 +4,7 @@ import { unavailableModel } from '../providers/grant.js';
 
 const initial = {
   id: 'reader', name: 'Reader', instructions: 'Discuss the selected passage in the context of the reader’s question.',
-  modelId: 'gpt-6.1-sol', thinking: 'high', tier: 'fast', tools: ['ask'],
+  modelId: 'gpt-6.2-sol', thinking: 'high', tier: 'fast', tools: ['ask'],
 };
 
 export async function profiles() {

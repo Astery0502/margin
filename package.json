@@ -22,8 +22,9 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "1.1.0",
-    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-agent-core": "1.6.0",
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-schema": "1.6.0",
     "@huggingface/transformers": "3.8.1",
     "dompurify": "^3.4.16",
     "idb": "8.0.3",

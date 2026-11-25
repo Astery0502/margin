@@ -52,9 +52,11 @@ for (const asset of ['transformers.min.js', 'ort-wasm-simd-threaded.jsep.mjs', '
 await cp(resolve(speechLibrary, 'LICENSE'), resolve(destination, 'LICENSE.transformers'));
 await copySpeechModel(root, destination);
 await cp(resolve(root, 'third-party'), resolve(destination, 'licenses'), { recursive: true });
-for (const [name, license] of [['idb', 'LICENSE'], ['openai', 'LICENSE'], ['typebox', 'license'], ['partial-json', 'LICENSE']]) {
+for (const [name, license] of [['idb', 'LICENSE'], ['openai', 'LICENSE'], ['partial-json', 'LICENSE']]) {
   await cp(resolve(root, 'node_modules', name, license), resolve(destination, 'licenses', 'LICENSE.' + name));
 }
+
+await cp(resolve(root, 'node_modules/@earendil-works/pi-schema/THIRD_PARTY_NOTICES'), resolve(destination, 'licenses/pi-schema'), { recursive: true });
 
 const download = process.env.MARGIN_CONNECT_DOWNLOAD_URL;
 if (download) {

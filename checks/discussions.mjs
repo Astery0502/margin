@@ -9,7 +9,7 @@ import { chromium, expect } from '@playwright/test';
 const root = await mkdtemp(join(tmpdir(), 'margin-discussions-'));
 const extension = join(root, 'extension');
 const pdf = await readFile(new URL('./fixtures/sample.pdf', import.meta.url));
-let modelIds = ['gpt-6.1-sol'], modelGate;
+let modelIds = ['gpt-6.2-sol'], modelGate;
 const server = createServer(async (req, res) => {
   if (req.url === '/models') {
     await modelGate?.promise;
@@ -44,7 +44,7 @@ try {
   context.on('weberror', event => errors.push(event.error().message));
   const settings = await context.newPage();
   await settings.goto(new URL('options.html', worker.url()).href);
-  await expect(settings.locator('.model-field').getByText('GPT-6.1 Sol', { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(settings.locator('.model-field').getByText('GPT-6.2 Sol', { exact: true }).filter({ visible: true })).toBeVisible();
   await expect(settings.getByRole('button', { name: /^Preferred model:/ })).toHaveCount(0);
   await settings.getByLabel('Read and write notes for this page').check();
   await settings.getByLabel('Delegate reading tasks on this page').check();
@@ -127,7 +127,7 @@ try {
   await modelSummary.click();
   await chooseModel.click();
   await page.getByRole('option', { name: 'o3', exact: true }).click();
-  modelIds = ['gpt-6.1-sol', 'gpt-5'];
+  modelIds = ['gpt-6.2-sol', 'gpt-5'];
   modelGate.resolve();
   await expect(page.getByText(/o3 is no longer available/)).toBeVisible();
   await expect(quickDraft).toHaveValue('Keep this draft');
