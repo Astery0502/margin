@@ -67,6 +67,12 @@ async function checkDictation({ voice, speech, expected, duration = 4600, langua
     await page.bringToFront();
     await expect(page.getByRole('button', { name: 'Stop recording' })).toBeEnabled();
     if (checkLifecycle) {
+      await page.getByRole('button', { name: 'Resize discussion' }).press('ArrowUp');
+      const waveform = await page.getByRole('img', { name: 'Microphone activity' }).boundingBox();
+      const status = await page.getByText(/^Recording \d+:\d+$/).boundingBox();
+      assert.ok(waveform.width > 0 && status.width > 0);
+      assert.ok(status.x + status.width <= waveform.x || waveform.y + waveform.height <= status.y,
+        'The recording status must have its own space beside or below the waveform.');
       await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Return to recording draft' }).click();
     }

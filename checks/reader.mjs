@@ -65,8 +65,16 @@ try {
   const draft = reader.getByRole('textbox', { name: 'Discussion draft' });
   await draft.fill('Why does the author make this distinction?');
   await expect(draft).toBeFocused();
+  await reader.getByRole('button', { name: 'Add image' }).click();
+  await reader.mouse.move(200, 160);
+  await reader.mouse.down();
+  await reader.mouse.move(320, 220, { steps: 4 });
+  await reader.mouse.up();
+  await expect(reader.getByText('1 image attached', { exact: true })).toBeVisible();
+  await expect(reader.locator('#attached-quote')).toBeHidden();
   await reader.keyboard.press('Escape');
   await expect(draft).toHaveCount(0);
+  await expect(reader.getByRole('button', { name: 'Return to question' })).toHaveCount(0);
   await reader.locator('#zoom').selectOption('1.5');
   await reader.getByRole('button', { name: 'Rotate', exact: true }).click();
   await reader.locator('#page').fill('8');

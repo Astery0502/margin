@@ -21,7 +21,7 @@ test('discussion windows retain independent positions across host visibility cha
     for (const file of ['passage-ui.js', 'discussion-host.js']) {
       await page.addScriptTag({ path: new URL(file, browserDirectory).pathname });
     }
-    const results = await page.evaluate(() => {
+    const results = await page.evaluate(async () => {
       const style = document.createElement('style');
       style.textContent = discussionWindow.styles;
       document.head.append(style);
@@ -31,12 +31,19 @@ test('discussion windows retain independent positions across host visibility cha
         section.append(handle);
         document.body.append(section);
         const controller = discussionWindow.bind(section, handle, { top, anchor });
-        const record = { window: controller, frame: { setOpen(open) {
+        const record = { alive: true, view: { hide() {}, focusDraft() {} }, window: controller, frame: { setOpen(open) {
           section.hidden = !open;
           if (detach) { if (open) document.body.append(section); else section.remove(); }
         } } };
-        const host = { render() {}, changed() {} };
+        const host = { render() {}, changed() {}, open(record) {
+          PiSourceDiscussions.prototype.setOpen.call(host, record, true);
+          record.window.place();
+        } };
         return { section, handle, controller,
+          resumeCapture() {
+            host.captureRecord = record;
+            return PiSourceDiscussions.prototype.resumeCapture.call(host);
+          },
           toggle(open) { PiSourceDiscussions.prototype.setOpen.call(host, record, open); },
           coords() { const { left, top } = section.getBoundingClientRect(); return { left, top }; },
         };
@@ -44,7 +51,7 @@ test('discussion windows retain independent positions across host visibility cha
       const anchor = { right: 100, bottom: 100 };
       const otherAnchor = { right: 400, bottom: 300 };
       window.testWindows = [];
-      return [false, true].map(detach => {
+      return Promise.all([false, true].map(async detach => {
         let currentAnchor = anchor;
         const first = create(detach, detach ? 52 : 8, () => currentAnchor);
         first.controller.place();
@@ -72,14 +79,12 @@ test('discussion windows retain independent positions across host visibility cha
         first.controller.place();
         const resizedReopened = first.coords();
         const reopenedWidth = first.section.getBoundingClientRect().width;
-        first.controller.dock();
-        const docked = first.coords();
+
         window.testWindows.push(first);
         first.toggle(false);
-        first.toggle(true);
-        first.controller.place();
-        return { initial, reopened, moved, movedReopened, independent, resized, resizedReopened, resizedWidth, reopenedWidth, docked, dockedReopened: first.coords() };
-      });
+        await first.resumeCapture();
+        return { initial, reopened, moved, movedReopened, independent, resized, resizedReopened, resizedWidth, reopenedWidth, afterCapture: first.coords() };
+      }));
     });
     for (const result of results) {
       assert.deepEqual(result.reopened, result.initial);
@@ -89,7 +94,7 @@ test('discussion windows retain independent positions across host visibility cha
       assert.deepEqual(result.resizedReopened, result.resized);
       assert.equal(result.resizedWidth, 510);
       assert.equal(result.reopenedWidth, result.resizedWidth);
-      assert.deepEqual(result.dockedReopened, result.docked);
+      assert.deepEqual(result.afterCapture, result.resized);
     }
     await page.setViewportSize({ width: 600, height: 550 });
     const constrained = await page.evaluate(() => {

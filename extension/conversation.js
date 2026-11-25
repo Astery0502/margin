@@ -46,17 +46,33 @@ class PiConversation {
         *{box-sizing:border-box}[hidden]{display:none!important}button,textarea,input{font:inherit}button{cursor:pointer;border:1px solid #d9e2d3;background:#f3f7ec;color:#426344;border-radius:7px;padding:6px 10px}button:disabled{opacity:.5;cursor:default}button:focus-visible,textarea:focus-visible{outline:2px solid #6b8f60;outline-offset:2px}
         header{padding-bottom:10px;border-bottom:1px solid #dfe6d9}.heading{display:flex;align-items:start;gap:6px}h3{margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere;flex:1;min-width:0}.source-context{margin-top:5px;font-size:11px;color:#7a8d6c}.source-context summary{cursor:pointer;width:max-content}.source-context[open] summary{margin-bottom:6px}.origin{display:flex;gap:8px;align-items:start;margin-top:5px}.origin a{color:#6e8065;font-size:11px;overflow-wrap:anywhere;flex:1}blockquote{margin:10px 0;padding-left:10px;border-left:2px solid #bfceb1;font-size:12px;color:#6b7c60;max-height:85px;overflow:auto}
         #messages{flex:1;min-height:${composerHeights.messages}px;overflow:auto;overscroll-behavior:contain;padding:10px 0}.message{padding:10px 0;border-bottom:1px solid #e7ebdf;overflow-wrap:anywhere}.speaker{font-size:10px;color:#7f9073;display:block;margin-bottom:4px}.message-body:not(.markdown){white-space:pre-wrap;margin:0}.empty{color:#829077;font-size:12px}summary{cursor:pointer}
-        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:11px;color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}.model-options{position:fixed;inset:auto;margin:0;width:260px;max-width:calc(100vw - 48px);z-index:5;border:1px solid #c9d7bf;border-radius:9px;padding:12px;background:#f8fbf4;box-shadow:0 4px 18px #233a2520}.model-options label{display:block;margin-bottom:8px}.model-options select{display:block;width:100%;min-width:0;font:inherit;color:#36523b;background:#fff;border:1px solid #d9e2d3;border-radius:5px;padding:5px}.model-options p{margin:4px 0 0;color:#7a8d6c;line-height:1.5}.actions{min-width:0}.actions{flex-wrap:nowrap!important}form{container-type:inline-size;flex-shrink:0;border:1px solid #d9e2d3;border-radius:10px;background:#f1f5eb;padding:8px;margin-top:8px}textarea{width:100%;display:block;min-height:${composerHeights.followup}px;max-height:${composerHeights.followupLimit}px;resize:none;border:0;background:transparent;color:#2d4435;line-height:1.6;padding:2px}.actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}#send{background:#365d3e;border-color:#365d3e;color:#fff}#voice-recovery{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}#voice-recovery audio{width:100%;height:32px}#voice{font-size:11px}#cancel-voice{font-size:11px}.status{font-size:11px;color:#76866a;min-height:18px;margin:6px 0 0}#error{color:#a04c36;white-space:pre-wrap}.status:empty{display:none}
+        textarea:focus-visible{outline:0}form:focus-within{border-color:#7d9c68}#model-settings{position:relative;min-width:0;max-width:180px;flex:0 1 auto;font-size:11px;color:#6b7c60}#model-summary{border:0;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;display:flex;align-items:center;gap:4px;min-width:0;list-style:none;padding:4px 2px;cursor:pointer}.model-name{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.model-option{display:flex;align-items:center;flex:none;width:14px;height:14px}.model-option svg{width:100%;height:100%;fill:currentColor}.reasoning-bars rect{opacity:.2}.reasoning-bars rect.active{opacity:1}#tier-name{opacity:.3}#tier-name[data-fast="true"]{color:#698b34;opacity:1}#model-settings[data-disabled="true"] #model-summary{opacity:.6;cursor:default}.model-options{position:fixed;inset:auto;margin:0;width:260px;max-width:calc(100vw - 48px);z-index:5;border:1px solid #c9d7bf;border-radius:9px;padding:12px;background:#f8fbf4;box-shadow:0 4px 18px #233a2520}.model-options label{display:block;margin-bottom:8px}.model-options select{display:block;width:100%;min-width:0;font:inherit;color:#36523b;background:#fff;border:1px solid #d9e2d3;border-radius:5px;padding:5px}.model-options p{margin:4px 0 0;color:#7a8d6c;line-height:1.5}
+        form{container-type:inline-size;flex-shrink:0;border:1px solid #d9e2d3;border-radius:10px;background:#f1f5eb;padding:8px;margin-top:8px}textarea{width:100%;display:block;min-height:${composerHeights.followup}px;max-height:${composerHeights.followupLimit}px;resize:none;border:0;background:transparent;color:#2d4435;line-height:1.6;padding:2px}.actions{display:flex;min-width:0;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}#send{background:#365d3e;border-color:#365d3e;color:#fff}#voice-recovery{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}#voice-recovery audio{width:100%;height:32px}#voice{font-size:11px}#cancel-voice{font-size:11px}.status{font-size:11px;color:#76866a;min-height:18px;margin:6px 0 0}#error{color:#a04c36;white-space:pre-wrap}.status:empty{display:none}
         ${marginBrand.styles}
         :host(.external-title) #header{display:flex;align-items:start;gap:8px}:host(.external-title) .source-context{flex:1;min-width:0;margin-top:0}
         #draft-pi{display:none}#send,#voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#send[data-action="connect"]{width:auto;padding:3px 8px;font-size:11px}#send svg,#voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#voice[data-recording="true"] svg,#send[data-action="stop"] svg,#send[data-action="continue"] svg{fill:currentColor;stroke:none}
-        #cancel-voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;border:0;background:transparent;flex:none}#cancel-voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}#voice-waveform{flex:1;min-width:0;height:28px;color:#526c43}#voice-waveform svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}#composer[data-dictating="true"] .actions{width:100%;margin:0}#composer[data-dictating="true"] #draft-pi{display:none!important}
+        #cancel-voice{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;border:0;background:transparent;flex:none}#cancel-voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+        #recording-status{font-size:11px;color:#63765a;overflow-wrap:anywhere}
+        #voice-waveform{min-width:0;height:28px;color:#526c43}
+        #voice-waveform svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+        #composer[data-dictating="true"] .actions{display:grid;grid-template-columns:auto fit-content(55%) minmax(0,1fr) auto;width:100%;margin:0}
+        #composer[data-dictating="true"] #draft-pi{display:none!important}
         /* Keep space for the draft, mark and gaps before truncating long model names. */
-        :host(.new){flex:none}:host(.new) #messages{display:none}:host(.new) .actions{max-width:100%}:host(.new) #composer{display:flex;align-items:center;gap:8px;margin:0;padding:8px 10px;border:0;background:transparent;flex-wrap:wrap}:host(.new) #draft-pi{display:block;font:20px Georgia,serif;color:#638650}:host(.new) textarea{flex:1;min-width:80px;min-height:${composerHeights.initial}px;height:${composerHeights.initial}px;max-height:${composerHeights.initialLimit}px;resize:none}:host(.new) textarea:focus-visible{outline:0}:host(.new) .actions{margin:0;flex:0 1 auto;max-width:calc(100% - 116px)}:host(.new) #composer[data-dictating="true"] .actions{flex:1;max-width:100%}:host(.new) .status{margin:0 10px 5px}
+        :host(.new){flex:none}:host(.new) #messages{display:none}:host(.new) .actions{max-width:100%}:host(.new) #composer{display:flex;align-items:center;gap:8px;margin:0;padding:8px 10px;border:0;background:transparent;flex-wrap:wrap}:host(.new) #draft-pi{display:block;font:20px Georgia,serif;color:#638650}:host(.new) textarea{flex:1;min-width:80px;min-height:${composerHeights.initial}px;height:${composerHeights.initial}px;max-height:${composerHeights.initialLimit}px;resize:none}:host(.new) textarea:focus-visible{outline:0}:host(.new) .actions{margin:0;flex:0 1 auto;max-width:calc(100% - 116px)}
+        :host(.new) #composer[data-dictating="true"]{display:grid;align-content:start;min-height:min-content}
+        :host(.new) #composer[data-dictating="true"] .actions{max-width:none}
+        :host(.new) .status{margin:0 10px 5px}
         :host(.new.resized){flex:1;min-height:0}:host(.new.resized) #composer{flex:1;min-height:0}:host(.new.resized) textarea{align-self:stretch;height:auto;max-height:none}
         :host(.new.expanded) #composer{flex-direction:column;align-items:stretch;flex-wrap:nowrap}:host(.new.expanded) #draft-pi{display:none}:host(.new.expanded) textarea{min-width:0;flex-basis:auto}:host(.new.expanded) .actions{flex:none;width:100%;max-width:none;justify-content:flex-end}:host(.new.expanded) #attached-quote,:host(.new.expanded) #images{flex:none}
         #attached-quote{flex-basis:100%;width:100%;margin:0;max-height:65px;overflow:auto}
-        #images{display:flex;gap:6px;flex-wrap:wrap;flex-basis:100%;width:100%}#images:empty{display:none}#images figure{margin:0;position:relative}#images img{display:block;max-width:110px;height:72px;object-fit:contain;border:1px solid #cbd8c0;border-radius:6px}#images button{position:absolute;right:0;top:0;padding:0;width:20px;height:20px;border-radius:4px;background:#fffef8}#add-image{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#add-image svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+        :host(.new) #attached-quote{display:none}
+        #images{flex-basis:100%;min-width:0;font-size:12px;color:#526c43}
+        #images summary{width:fit-content;cursor:pointer}
+        #image-previews{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+        #images figure{margin:0;position:relative}
+        #images img{display:block;max-width:110px;height:72px;object-fit:contain;border:1px solid #cbd8c0;border-radius:6px}
+        #images button{position:absolute;right:0;top:0;padding:0;width:20px;height:20px;border-radius:4px;background:#fffef8}
+        #add-image{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;flex:none}#add-image svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
         #activity{display:flex;align-items:center;gap:7px;flex:none;min-height:20px;margin:6px 0;color:#6b805c;font-size:11px}#activity-spinner{width:11px;height:11px;border:1.5px solid #d9e2d3;border-top-color:currentColor;border-right-color:currentColor;border-radius:50%;animation:working 1.3s linear infinite}@keyframes working{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#activity-spinner{animation:none}}
         #queued-inputs{flex:none;max-height:96px;overflow:auto;overscroll-behavior:contain;margin-top:8px}.queued-input{border-radius:8px;background:#f1f5eb;padding:8px 10px}.queued-input+.queued-input{margin-top:5px}.queued-label{display:block;font-size:11px;color:#76866a}.queued-text{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px}
         #keyboard-hints{display:flex;flex:none;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:5px 0 0;font-size:11px;color:#76866a}kbd{font:inherit;color:#526c43}:host(:not(.new)) #model-settings{margin-right:auto}
@@ -67,11 +83,13 @@ class PiConversation {
       <div id="extension-requests" aria-live="polite"></div><div id="messages" aria-live="polite"></div>
       <div id="activity" role="status" hidden><span id="activity-spinner" aria-hidden="true"></span><span id="activity-label">Working</span></div>
       <div id="queued-inputs" aria-label="Pending messages" aria-live="polite" hidden></div>
-      <form id="composer"><blockquote id="attached-quote" hidden></blockquote><div id="images" aria-label="Images attached to question"></div><span id="draft-pi" aria-hidden="true">${marginBrand.icon}</span><textarea id="draft" rows="1" aria-label="Discussion draft" placeholder="Ask about this passage…" disabled></textarea><div class="actions"><button id="cancel-voice" type="button" aria-label="Cancel dictation" title="Cancel dictation" hidden>${voiceIcons.cancel}</button><div id="voice-waveform" role="img" aria-label="Microphone activity" hidden><svg viewBox="0 0 192 28" preserveAspectRatio="none" aria-hidden="true"><path/></svg></div><div id="model-settings"><button id="model-summary" type="button" popovertarget="model-options" aria-label="Model settings"><span class="model-name" id="model-name">Model</span><span class="model-option reasoning-bars" id="thinking-name" aria-hidden="true" hidden><svg viewBox="0 0 15 14"><rect x="0" y="10" width="2" height="4"/><rect x="3" y="8" width="2" height="6"/><rect x="6" y="6" width="2" height="8"/><rect x="9" y="3" width="2" height="11"/><rect x="12" y="0" width="2" height="14"/></svg></span><span class="model-option" id="tier-name" aria-hidden="true" hidden><svg viewBox="0 0 16 16"><path d="M9 0 2 9h5l-1 7 8-10H9z"/></svg></span></button><div id="model-options" class="model-options" popover><label>Model<select id="model" aria-label="Model" disabled><option>Model</option></select></label><label id="thinking-control">Reasoning<select id="thinking" aria-label="Reasoning level" disabled></select></label><label id="tier-control">Speed<select id="tier" aria-label="Speed mode" disabled></select></label><p>Changes become the default for new conversations.</p></div></div><button id="add-image" type="button" aria-label="Add image" title="Add image" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 4-5 4 5"/></svg></button><button id="voice" type="button" aria-label="Record" title="Record" hidden>${voiceIcons.record}</button><button id="send" type="button" aria-label="Send" title="Send" disabled>${composerIcons.send}</button></div></form>
+      <form id="composer"><blockquote id="attached-quote" hidden></blockquote><details id="images" hidden><summary id="image-count"></summary><div id="image-previews"></div></details><span id="draft-pi" aria-hidden="true">${marginBrand.icon}</span><textarea id="draft" rows="1" aria-label="Discussion draft" placeholder="Ask about this passage…" disabled></textarea><div class="actions"><button id="cancel-voice" type="button" aria-label="Cancel dictation" title="Cancel dictation" hidden>${voiceIcons.cancel}</button><span id="recording-status" role="status" hidden></span><div id="voice-waveform" role="img" aria-label="Microphone activity" hidden><svg viewBox="0 0 192 28" preserveAspectRatio="none" aria-hidden="true"><path/></svg></div><div id="model-settings"><button id="model-summary" type="button" popovertarget="model-options" aria-label="Model settings"><span class="model-name" id="model-name">Model</span><span class="model-option reasoning-bars" id="thinking-name" aria-hidden="true" hidden><svg viewBox="0 0 15 14"><rect x="0" y="10" width="2" height="4"/><rect x="3" y="8" width="2" height="6"/><rect x="6" y="6" width="2" height="8"/><rect x="9" y="3" width="2" height="11"/><rect x="12" y="0" width="2" height="14"/></svg></span><span class="model-option" id="tier-name" aria-hidden="true" hidden><svg viewBox="0 0 16 16"><path d="M9 0 2 9h5l-1 7 8-10H9z"/></svg></span></button><div id="model-options" class="model-options" popover><label>Model<select id="model" aria-label="Model" disabled><option>Model</option></select></label><label id="thinking-control">Reasoning<select id="thinking" aria-label="Reasoning level" disabled></select></label><label id="tier-control">Speed<select id="tier" aria-label="Speed mode" disabled></select></label><p>Changes become the default for new conversations.</p></div></div><button id="add-image" type="button" aria-label="Add image" title="Add image" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 4-5 4 5"/></svg></button><button id="voice" type="button" aria-label="Record" title="Record" hidden>${voiceIcons.record}</button><button id="send" type="button" aria-label="Send" title="Send" disabled>${composerIcons.send}</button></div></form>
       <div id="keyboard-hints" hidden><span><kbd>Enter</kbd> <span id="submit-hint">send</span></span><span id="queue-hint" hidden><kbd>Tab</kbd> queue</span><span><kbd>Shift + Enter</kbd> new line</span></div>
       <p id="status" class="status" role="status"></p><p id="voice-status" class="status" role="status"></p><div id="voice-recovery" hidden><button id="retry-voice" type="button">Retry</button><button id="listen-voice" type="button">Listen</button><audio id="voice-audio" controls hidden></audio></div><p id="error" class="status" role="alert"></p>`;
     this.$ = id => this.shadow.getElementById(id);
+    this.captureImages = captureImages;
     this.$('add-image').hidden = !captureImages;
+    this.$('images').addEventListener('toggle', () => this.renderImagePreviews());
     this.$('add-image').addEventListener('click', () => this.root.dispatchEvent(new Event('pi-conversation-images')));
     this.title = title || this.$('title');
     this.$('header').hidden = inline;
@@ -215,8 +233,7 @@ class PiConversation {
     if (version !== this.version) return;
     this.prepared = values;
     this.readBody = readBody;
-    this.passage = values.source;
-    this.renderImages();
+    this.setPassage(values.source);
     this.id = `draft:${identifier}`;
     this.$('draft').disabled = false;
     this.renderActivity();
@@ -243,7 +260,7 @@ class PiConversation {
       this.pending = null;
       PiMessages.update(this.$('messages'), []);
       this.$('messages').textContent = 'Loading conversation…';
-      this.setInput(this.inputs.get(sessionId) || { text: '', images: [] });
+      this.setInput(this.inputs.get(sessionId));
       this.inputs.delete(sessionId);
       this.$('draft').disabled = false;
       this.error();
@@ -252,7 +269,7 @@ class PiConversation {
     await Promise.all([this.refresh(), this.capabilities(), this.loadModels()]);
   }
 
-  get hasInput() { return this.hasTextDraft || this.images.length > 0 || Boolean(this.passage) || this.hasDictation; }
+  get hasInput() { return Boolean(this.$('draft').value) || this.images.length > 0 || Boolean(this.passage) || this.hasDictation; }
 
   get hasTextDraft() { return Boolean(this.$('draft').value.trim()); }
 
@@ -262,8 +279,6 @@ class PiConversation {
     return PiBrowser.available && Boolean(this.session || this.prepared) && !this.session?.busyElsewhere && !this.pending && !this.hasDictation
       && (this.hasTextDraft || this.canContinue);
   }
-
-  get hasImageDraft() { return this.images.length > 0 || Boolean(this.keepImageDraft && this.hasTextDraft); }
 
   get modelCapabilities() {
     const model = (this.session || this.selectedSettings || this.defaults)?.model;
@@ -287,13 +302,20 @@ class PiConversation {
     }
     const width = draft.clientWidth;
     if (!width || draft.hidden) return;
-    const composer = this.$('composer');
     const minimum = initial ? composerHeights.initial : composerHeights.followup;
-    const surroundingHeight = ['header', 'extension-requests', 'activity', 'queued-inputs', 'keyboard-hints', 'status', 'voice-status', 'voice-recovery', 'error']
-      .reduce((height, id) => { const element = this.$(id); const style = getComputedStyle(element);
-        return height + (element.offsetHeight ? element.offsetHeight + parseFloat(style.marginTop) + parseFloat(style.marginBottom) : 0); }, 0);
-    const availableHeight = this.root.clientHeight - surroundingHeight - composerHeights.messages - (composer.offsetHeight - draft.offsetHeight) - 8;
-    const maximum = initial ? composerHeights.initialLimit : Math.max(minimum, Math.min(composerHeights.followupLimit, availableHeight));
+    let maximum = composerHeights.initialLimit;
+    if (!initial) {
+      const surroundingHeight = ['header', 'extension-requests', 'activity', 'queued-inputs', 'keyboard-hints', 'status', 'voice-status', 'voice-recovery', 'error']
+        .reduce((height, id) => {
+          const element = this.$(id);
+          if (!element.offsetHeight) return height;
+          const style = getComputedStyle(element);
+          return height + element.offsetHeight + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+        }, 0);
+      const composerSpace = this.$('composer').offsetHeight - draft.offsetHeight;
+      const available = this.root.clientHeight - surroundingHeight - composerHeights.messages - composerSpace - 8;
+      maximum = Math.max(minimum, Math.min(composerHeights.followupLimit, available));
+    }
     const key = JSON.stringify([draft.value, width, initial, maximum]);
     if (key === this.draftLayout) return;
     this.draftLayout = key;
@@ -308,7 +330,7 @@ class PiConversation {
 
   invalidate() {
     this.version++; this.id = null; this.session = null; this.prepared = null;
-    this.images = []; this.passage = undefined; this.keepImageDraft = false; this.renderImages(); this.hide();
+    this.setInput(); this.hide();
     this.root.dispatchEvent(new Event('pi-conversation-removed'));
   }
 
@@ -357,7 +379,7 @@ class PiConversation {
       const input = event.sessionId === this.id ? this.input : this.inputs.get(event.sessionId);
       if (input?.text === event.text && JSON.stringify(input.images) === JSON.stringify(event.images || []) && JSON.stringify(input.passage) === JSON.stringify(event.passage)) {
         this.inputs.delete(event.sessionId);
-        if (event.sessionId === this.id) this.setInput({ text: '', images: [] });
+        if (event.sessionId === this.id) this.setInput();
       }
     }
     if (event.type === 'dictation-result') {
@@ -378,13 +400,13 @@ class PiConversation {
 
   get input() { return { text: this.$('draft').value, images: this.images, passage: this.passage }; }
 
-  setInput(input) {
+  setInput(input = { text: '', images: [] }) {
     this.$('draft').value = input.text;
     this.images = input.images;
-    this.passage = input.passage;
-    this.keepImageDraft = false;
+    this.setPassage(input.passage);
     this.renderImages();
     this.renderActivity();
+    this.root.dispatchEvent(new Event('pi-conversation-input'));
   }
 
   acceptInput(sessionId, input) {
@@ -431,30 +453,44 @@ class PiConversation {
     const input = this.input;
     const opened = await this.perform('panel', { input });
     if (opened) {
-      if (this.matchesInput(input)) this.setInput({ text: '', images: [] });
+      if (this.matchesInput(input)) this.setInput();
       this.root.dispatchEvent(new Event('pi-conversation-panel'));
     } else await this.receiveDictation(this.id);
   }
 
+  setPassage(passage) {
+    this.passage = passage;
+    this.$('attached-quote').textContent = passage?.selection || '';
+    this.$('attached-quote').hidden = !passage;
+  }
+
   renderImages() {
-    this.$('attached-quote').textContent = this.passage?.selection || '';
-    this.$('attached-quote').hidden = !this.passage || (this.root.classList.contains('new') && !this.images.length);
-    this.$('images').replaceChildren(...this.images.map((image, index) => {
+    const count = this.images.length;
+    const details = this.$('images');
+    details.hidden = !count;
+    if (!count) details.open = false;
+    this.$('image-count').textContent = count === 1 ? '1 image attached' : `${count} images attached`;
+    this.renderImagePreviews();
+  }
+
+  renderImagePreviews() {
+    const images = this.$('images').open ? this.images : [];
+    this.$('image-previews').replaceChildren(...images.map((image, index) => {
       const box = document.createElement('figure');
       const preview = document.createElement('img');
       preview.src = `data:${image.mimeType};base64,${image.data}`;
       preview.alt = `Attached image ${index + 1}`;
       const remove = document.createElement('button');
       remove.type = 'button'; remove.textContent = '×';
+      remove.disabled = Boolean(this.pending);
       remove.setAttribute('aria-label', `Remove image ${index + 1}`);
-      remove.addEventListener('click', () => this.setImages(this.images.filter((_, position) => position !== index)).catch(error => this.error(error)));
+      remove.addEventListener('click', () => this.setImages(this.images.filter((_, position) => position !== index)));
       box.append(preview, remove);
       return box;
     }));
-    this.root.dispatchEvent(new Event('pi-conversation-image-draft'));
   }
 
-  async setImages(images) {
+  setImages(images) {
     this.images = images;
     this.renderImages();
     this.renderActivity();
@@ -496,7 +532,7 @@ class PiConversation {
     }
     const images = this.images;
     const id = this.id;
-    if (await this.perform('send', { text, images, passage: input.passage, mode, inputText: input.text }) && this.id === id && this.matchesInput(input)) this.setInput({ text: '', images: [] });
+    if (await this.perform('send', { text, images, passage: input.passage, mode, inputText: input.text }) && this.id === id && this.matchesInput(input)) this.setInput();
   }
 
   matchesInput(input) {
@@ -628,6 +664,8 @@ class PiConversation {
     this.$('draft').readOnly = dictating;
     this.$('model-settings').hidden = dictating;
     this.$('voice-waveform').hidden = !dictating;
+    this.$('recording-status').hidden = !dictating;
+    this.$('add-image').hidden = !this.captureImages || dictating;
     this.$('send').hidden = recording;
     const action = running || this.pending?.action === 'send' ? 'stop' : this.accountConnected === false ? 'connect' : this.canContinue ? 'continue' : 'send';
     const submit = this.$('send');
@@ -671,12 +709,13 @@ class PiConversation {
       this.previousDictation = this.hasDictation;
       this.root.dispatchEvent(new Event('pi-conversation-dictation'));
     }
-    this.$('voice-status').textContent = recording ? ({
+    this.$('recording-status').textContent = dictating ? ({
       preparing: 'Checking voice setup…', permission: 'Allow microphone access in the extension tab.', requesting: 'Waiting for microphone access…',
       recording: `Recording ${elapsed}`,
       transcribing: 'Transcribing into this draft…', delivering: 'Adding text to your draft…',
-      error: `Recording kept. ${this.voice.error || 'Retry to add it to your draft.'}`,
-    }[this.voice.state] || '') : this.voice.sessionId === this.id && this.voice.error ? this.voice.error : '';
+    }[this.voice.state] || '') : '';
+    this.$('voice-status').textContent = recovering ? `Recording kept. ${this.voice.error || 'Retry to add it to your draft.'}`
+      : !dictating && this.voice.sessionId === this.id && this.voice.error ? this.voice.error : '';
     this.fitDraft();
 
   }

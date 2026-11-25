@@ -48,38 +48,82 @@ try {
   await panel.goto(new URL('sidepanel.html', worker.url()).href);
   const rpc = (action, values = {}) => panel.evaluate(([name, data]) => PiBrowser.request(name, data), [action, values]);
   const listed = async () => (await rpc('browse', {})).sessions;
-  async function compose(index, mode, question) {
+  async function openDraft(index, mode) {
     await page.bringToFront();
     await page.locator('body > p').nth(index).evaluate(p => {
       const range = document.createRange(); range.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(range);
       p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
     await page.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: mode, exact: true }).click();
+  }
+  async function compose(index, mode, question) {
+    await openDraft(index, mode);
     const draft = page.getByRole('textbox', { name: 'Discussion draft' });
     await draft.fill(question);
     await draft.press('Enter');
   }
 
-  await page.bringToFront();
-  await page.locator('body > p').first().evaluate(p => {
-    const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r);
-    p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-  });
-  await page.getByRole('toolbar', { name: 'Discuss passage' }).getByRole('button', { name: 'Quick' }).click();
-  await page.getByRole('button', { name: 'Add image' }).click();
-  await expect(page.getByRole('dialog', { name: 'Select image region' })).toBeVisible();
-  await page.mouse.move(15, 15);
-  await page.mouse.down();
-  await page.mouse.move(220, 65, { steps: 6 });
-  await page.mouse.up();
-  await expect(page.getByAltText('Attached image 1')).toBeVisible();
   const quickDraft = page.getByRole('textbox', { name: 'Discussion draft' });
+  async function captureImage() {
+    await page.getByRole('button', { name: 'Add image' }).click();
+    await expect(page.getByRole('dialog', { name: 'Select image region' })).toBeVisible();
+    await page.mouse.move(15, 15);
+    await page.mouse.down();
+    await page.mouse.move(220, 65, { steps: 6 });
+    await page.mouse.up();
+    await expect(quickDraft).toBeVisible();
+  }
+
+  for (const dismissal of ['Escape', 'outside click']) {
+    await openDraft(0, 'Quick');
+    await quickDraft.fill('Unsent image question');
+    await captureImage();
+    const expandedQuote = await page.locator('#attached-quote').isVisible();
+    if (dismissal === 'Escape') await quickDraft.press('Escape');
+    else await page.mouse.click(8, 8);
+    await expect(quickDraft).toBeHidden();
+    await openDraft(1, 'Quick');
+    assert.deepEqual({
+      expandedQuote, nextText: await quickDraft.inputValue(), nextPassage: await page.locator('#quote').last().textContent(),
+      showsAttachments: await page.locator('#images').isVisible(),
+    }, { expandedQuote: false, nextText: '', nextPassage: 'Second passage on this page.', showsAttachments: false });
+    await quickDraft.press('Escape');
+  }
+  await openDraft(0, 'Quick');
+  const discussion = page.locator('.floating-dialog:visible');
+  const beforeCapture = await discussion.boundingBox();
+  await captureImage();
+  await expect(page.locator('#attached-quote')).toBeHidden();
+  await expect(page.getByAltText('Attached image 1')).toBeHidden();
+  await page.getByText('1 image attached', { exact: true }).click();
+  await expect(page.getByAltText('Attached image 1')).toBeVisible();
+  const afterCapture = await discussion.boundingBox();
+  assert.equal(afterCapture.x, beforeCapture.x);
+  assert.equal(afterCapture.y, beforeCapture.y);
   await quickDraft.fill('Explain this figure');
   await quickDraft.press('Enter');
   await expect.poll(async () => (await listed())[0]?.status).toBe('completed');
   const photoDetail = await rpc('detail', { sessionId: (await listed())[0].id });
+  assert.equal(photoDetail.messages.find(message => message.role === 'user').presentation.passage.text, 'First passage on this page.');
   assert.match(JSON.stringify(photoDetail.messages.at(-1)?.content), /equation/);
   await expect(page.locator('.katex')).toBeVisible();
+  // Cancelling the region selector returns to the same input; dismissing the
+  // discussion drops the follow-up, while its submitted history stays intact.
+  await quickDraft.fill('Unsent follow-up');
+  await captureImage();
+  await page.getByRole('button', { name: 'Add image' }).click();
+  await page.keyboard.press('Escape');
+  await expect(quickDraft).toHaveValue('Unsent follow-up');
+  await expect(page.getByText('1 image attached', { exact: true })).toBeVisible();
+  const reopenQuick = page.locator('[data-pi-session-id]').getByRole('button', { name: 'Quick', exact: true });
+  await page.mouse.click(8, 8);
+  await reopenQuick.click();
+  await expect(quickDraft).toHaveValue('');
+  await expect(page.locator('#images')).toBeHidden();
+  await quickDraft.fill('  \n');
+  await quickDraft.press('Escape');
+  await reopenQuick.click();
+  await expect(quickDraft).toHaveValue('');
   const answer = page.getByText('this equation', { exact: true });
   const box = await answer.boundingBox();
   await page.mouse.move(box.x, box.y + box.height / 2); await page.mouse.down();

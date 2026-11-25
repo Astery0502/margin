@@ -46,9 +46,11 @@ class PiSourceDiscussions {
       if (!event.target.closest('[data-action="panel"]')) this.relate(record);
     });
     frame.root.addEventListener('pi-conversation-dictation', () => this.changed());
-    frame.root.addEventListener('pi-conversation-image-draft', () => { this.render(record); this.changed(); });
+    frame.root.addEventListener('pi-conversation-input', () => {
+      if (record.suspendedRecording) this.changed();
+    });
     frame.root.addEventListener('pi-conversation-removed', () => this.remove(record));
-    frame.root.addEventListener('pi-conversation-panel', () => this.close(record));
+    frame.root.addEventListener('pi-conversation-panel', () => this.close(record, { handedOff: true }));
     frame.root.addEventListener('pi-conversation-forked', event => this.openSession(event.detail).catch(error => this.error(error)));
     frame.root.addEventListener('pi-conversation-images', () => {
       this.options.dismissSelection();
@@ -95,6 +97,7 @@ class PiSourceDiscussions {
     if (this.imageCapture.active || !record?.alive) return;
     if (this.current && this.current !== record) this.close(this.current);
     this.current = record;
+    record.suspendedRecording = false;
     const operation = {};
     record.openOperation = operation;
     if (!record.open) record.frame.section.style.visibility = 'hidden';
@@ -147,6 +150,7 @@ class PiSourceDiscussions {
   async prepare(source, includeFullText) {
     const operation = {};
     this.opening = operation;
+    window.getSelection().removeAllRanges();
     this.changed();
     let record;
     try {
@@ -178,7 +182,6 @@ class PiSourceDiscussions {
         await record.view.prepare({ source: record.session.source, includeFullText }, readBody);
         if (this.opening !== operation || !record.alive || !record.open) return;
       }
-      window.getSelection().removeAllRanges();
       this.present(record);
     } catch (error) {
       if (this.opening !== operation) return;
@@ -190,13 +193,21 @@ class PiSourceDiscussions {
     }
   }
 
-  retained(record) { return Boolean(record.view?.hasDictation || record.view?.hasImageDraft || (record.retained && record.view?.hasTextDraft)); }
+  retained(record) {
+    return record.view?.hasDictation || (record.suspendedRecording && record.view?.hasTextDraft);
+  }
 
-  close(record = this.current) {
+  close(record = this.current, { handedOff = false } = {}) {
     if (!record) return;
-    if (this.retained(record)) record.retained = true;
-    if (record.session.id || this.retained(record) || record.view?.pending?.action === 'create') this.setOpen(record, false);
-    else this.remove(record);
+    const view = record.view;
+    const submitting = ['create', 'send'].includes(view?.pending?.action);
+    record.suspendedRecording = Boolean(view?.hasDictation);
+    if (record.session.id || record.suspendedRecording || submitting) {
+      this.setOpen(record, false);
+      if (view?.hasInput && !record.suspendedRecording && !submitting && !handedOff) {
+        view.setInput();
+      }
+    } else this.remove(record);
     if (this.current === record) this.current = null;
     this.changed();
   }
@@ -241,19 +252,12 @@ class PiSourceDiscussions {
     const record = this.captureRecord;
     this.captureRecord = null;
     await this.open(record);
-    if (!record.alive || !record.open) return;
-    record.window.dock();
-    record.view.focusDraft();
   }
 
   async cancelCapture() {
     const record = this.captureRecord;
     this.captureRecord = null;
-    if (!record.session.id) this.remove(record);
-    else {
-      record.view.setInput({ text: '', images: [] });
-      this.close(record);
-    }
+    this.close(record);
   }
 
   async refresh() {

@@ -149,11 +149,6 @@ const discussionWindow = {
     return {
       place,
       retainPosition() { if (position) anchored = false; },
-      dock() {
-        const { width, height } = section.getBoundingClientRect();
-        anchored = false;
-        setPosition(innerWidth - width - 16, innerHeight - height - 72, width, height);
-      },
     };
   },
 };

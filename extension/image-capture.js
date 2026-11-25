@@ -60,7 +60,6 @@ class PiImageCapture {
     this.onDispose = () => this.clear();
     view.root.addEventListener('pi-conversation-disposed', this.onDispose, { once: true });
     view.root.addEventListener('pi-conversation-removed', this.onDispose, { once: true });
-    view.keepImageDraft = true;
     this.callbacks.hide();
     window.getSelection().removeAllRanges();
     this.$('error').textContent = ''; this.$('box').hidden = true;
@@ -113,8 +112,7 @@ class PiImageCapture {
     canvas.width = Math.round(rect.width * scaleX); canvas.height = Math.round(rect.height * scaleY);
     canvas.getContext('2d').drawImage(image, rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY, 0, 0, canvas.width, canvas.height);
     if (this.view !== view) return;
-    await view.setImages([...view.images, { type: 'image', mimeType: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] }]);
-    if (this.view !== view) return;
+    view.setImages([...view.images, { type: 'image', mimeType: 'image/png', data: canvas.toDataURL('image/png').split(',')[1] }]);
     this.finish('resume');
   }
 
