@@ -59,7 +59,14 @@ try {
       execFileSync(go, ['build', '-trimpath', '-ldflags', flags, '-o', join(work, arch), '.'],
         { cwd: 'companion', stdio: 'inherit', env: { ...process.env, CC: cc, CGO_ENABLED: '1', GOOS: 'darwin', GOARCH: arch, MACOSX_DEPLOYMENT_TARGET: '14.0' } });
     }
-    execFileSync('lipo', ['-create', join(work, 'arm64'), join(work, 'amd64'), '-output', join(macos, 'MarginConnect')]);
+    const helpers = join(app, 'Contents/Helpers');
+    await mkdir(helpers);
+    const host = join(helpers, 'MarginConnect');
+    execFileSync('lipo', ['-create', join(work, 'arm64'), join(work, 'amd64'), '-output', host]);
+    const signing = ['--force', '--sign', identity, '--options', 'runtime', ...(identity === '-' ? [] : ['--timestamp'])];
+    execFileSync('codesign', [...signing, '--identifier', 'dev.margin.connect.host', host]);
+    execFileSync('clang', ['-arch', 'arm64', '-arch', 'x86_64', '-mmacosx-version-min=14.0', '-framework', 'Foundation',
+      'scripts/connect-launcher.m', '-o', join(macos, 'MarginConnect')]);
     await cp(licenses, join(app, 'Contents/Resources/Licenses'), { recursive: true });
     await writeFile(join(app, 'Contents/Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
@@ -68,8 +75,12 @@ try {
 <key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string><key>LSUIElement</key><true/>
 </dict></plist>\n`);
-    execFileSync('codesign', ['--force', '--sign', identity, '--options', 'runtime', ...(identity === '-' ? [] : ['--timestamp']), app]);
+    execFileSync('codesign', [...signing, app]);
     execFileSync('codesign', ['--verify', '--strict', app]);
+    // Installation copies only the host bytes. Verify that exact standalone layout.
+    const installedHost = join(work, 'MarginConnect');
+    await writeFile(installedHost, await readFile(host), { mode: 0o700 });
+    execFileSync('codesign', ['--verify', '--strict', '--all-architectures', installedHost]);
     execFileSync('ditto', ['-c', '-k', '--keepParent', app, buildArchive]);
     if (notaryProfile) {
       execFileSync('xcrun', ['notarytool', 'submit', buildArchive, '--keychain-profile', notaryProfile, '--wait'], { stdio: 'inherit' });
