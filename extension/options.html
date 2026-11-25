@@ -1,28 +1,57 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Margin settings</title>
   <link rel="stylesheet" href="options.css">
+  <script src="client.js" defer></script>
+  <script src="model-picker.js" defer></script>
   <script type="module" src="options.js"></script>
   <script type="module" src="dictation/settings.js"></script>
 </head>
-<body><main>
-<h1>Margin settings</h1>
-<section><h2>OpenAI subscription</h2>
-<p id="account">Use your ChatGPT plan to discuss passages.</p><a href="connect.html">Manage ChatGPT connection</a>
-</section>
-<section><h2>Agents</h2>
-<form id="agent-form">
-<label>Default agent<select id="profile"></select></label>
-<button type="button" id="new-agent">Add agent</button>
-<label>Name<input id="name" required></label>
-<label>Instructions<textarea id="instructions" rows="4"></textarea></label>
-<label>Preferred model<select id="model"></select></label>
-<label>Reasoning<select id="thinking"></select></label><label>Speed<select id="tier"><option value="default">Provider default</option><option value="fast">Fast</option></select></label>
-<fieldset><legend>Tools</legend><label><input type="checkbox" id="ask"> Ask the reader</label><label><input type="checkbox" id="notes"> Read and write notes for this page</label><label><input type="checkbox" id="delegate"> Delegate reading tasks on this page</label></fieldset>
-<button type="submit">Save agent settings</button><output id="status" role="status"></output>
-</form></section>
+<body>
+<main class="sheet">
+  <header class="masthead">
+    <img src="icons/margin-48.png" width="28" height="28" alt="">
+    <h1>Margin <span>settings</span></h1>
+  </header>
+
+  <section class="section" aria-labelledby="account-title">
+    <h2 id="account-title">Account</h2>
+    <div class="section-body">
+      <p class="item-title">ChatGPT subscription</p>
+      <a class="text-action" href="connect.html">Manage ChatGPT connection</a>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="agents-title">
+    <h2 id="agents-title">Agents</h2>
+    <form id="agent-form" class="section-body">
+      <div class="inline-fields agent-choice">
+        <label class="field" id="profile-field">Default agent<select id="profile"></select></label>
+        <label class="field name-field">Name<input id="name" required></label>
+        <button class="secondary" type="button" id="new-agent">Add agent</button>
+      </div>
+      <label class="field">Instructions<textarea id="instructions" rows="3"></textarea></label>
+
+      <div class="model-fields">
+        <div class="field model-field">Preferred model<div id="model-picker"></div></div>
+        <label class="field" id="thinking-field">Reasoning<select id="thinking"></select></label>
+        <label class="fast-mode"><input type="checkbox" id="tier"> Fast mode</label>
+      </div>
+
+      <fieldset class="tools"><legend>Tools</legend>
+        <label><input type="checkbox" id="ask"> Ask the reader</label>
+        <label><input type="checkbox" id="notes"> Read and write notes for this page</label>
+        <label><input type="checkbox" id="delegate"> Delegate reading tasks on this page</label>
+      </fieldset>
+      <div class="actions">
+        <button class="primary" type="submit">Save agent settings</button>
+        <output id="status" role="status"></output>
+      </div>
+    </form>
+  </section>
+
   <section class="section" aria-labelledby="dictation-title">
     <h2 id="dictation-title">Dictation</h2>
     <div class="section-body">
@@ -35,6 +64,13 @@
     </div>
   </section>
 
-<section><h2>Local files</h2><p id="file-access"></p>
-<button id="details">Open extension details</button></section>
-</main></body></html>
+  <section class="section" aria-labelledby="files-title">
+    <h2 id="files-title">Local files</h2>
+    <div class="section-body">
+      <p id="file-access"></p>
+      <button type="button" class="text-action" id="details">Open extension details</button>
+    </div>
+  </section>
+</main>
+</body>
+</html>

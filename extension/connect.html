@@ -1,13 +1,29 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect ChatGPT · Margin</title><link rel="stylesheet" href="options.css"><script type="module" src="connect.js"></script></head>
-<body><main><h1>Connect ChatGPT</h1>
-<p id="status" role="status">Checking Margin Connect…</p>
-<p id="install" hidden><a id="download" download>Download Margin Connect for macOS</a>. Unzip it and open the app once, then return to this tab.</p>
-<label id="accounts" hidden>ChatGPT account<select id="account"></select></label>
-<button id="connect" hidden>Continue with ChatGPT</button>
-<button id="retry" hidden>Check again</button>
-<button id="cancel" hidden>Cancel sign-in</button>
-<button id="disconnect" hidden>Disconnect account</button>
-<button id="back" hidden>Return to passage</button>
-</main></body></html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connect ChatGPT · Margin</title>
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="connect.js"></script>
+</head>
+<body>
+<main class="sheet connection">
+  <header class="masthead">
+    <img src="icons/margin-48.png" width="28" height="28" alt="">
+    <h1>Connect ChatGPT</h1>
+  </header>
+  <div class="connection-body">
+    <p id="status" role="status">Checking Margin Connect…</p>
+    <p id="install" hidden><a class="text-action" id="download" download>Download Margin Connect for macOS</a>. Unzip it and open the app once, then return to this tab.</p>
+    <label class="field" id="accounts" hidden>ChatGPT account<select id="account"></select></label>
+    <div class="actions">
+      <button class="primary" id="connect" hidden>Continue with ChatGPT</button>
+      <button class="secondary" id="retry" hidden>Check again</button>
+      <button class="secondary" id="cancel" hidden>Cancel sign-in</button>
+      <button class="secondary" id="disconnect" hidden>Disconnect account</button>
+      <button class="primary" id="back" hidden>Return to passage</button>
+    </div>
+  </div>
+</main>
+</body>
+</html>
