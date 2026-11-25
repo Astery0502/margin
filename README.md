@@ -4,6 +4,8 @@ Select a passage on a web page or PDF and open a Quick or Full discussion beside
 
 On macOS, write your first question and choose **Connect ChatGPT to send**. Download and open **Margin Connect** once, then approve Margin in ChatGPT. Return to the passage and send your draft. Manage or disconnect the account in **Margin settings → Manage ChatGPT connection**. While disconnected you can still read, draft, capture screenshots and dictate.
 
+Dictation recognizes Mandarin Chinese and English automatically. You can use both in one recording. A short pause when switching languages can improve recognition. To use a fixed language, choose it under **Margin settings → Dictation → Spoken language**. Stop recording to add the transcript to your draft.
+
 ## Install a GitHub build
 
 Download the preview from [GitHub Releases](https://github.com/Astery0502/margin/releases). The macOS release asset is `Margin-Chromium-macOS.zip`. Extract it, open the extensions page in Chrome or Edge, enable **Developer mode**, choose **Load unpacked**, and select the extracted `dist` folder. Keep that folder in place. The connection page offers Margin Connect from the same package. The initial build uses an ad hoc signature. Gatekeeper may block the first launch of the downloaded app.

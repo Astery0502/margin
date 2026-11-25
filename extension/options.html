@@ -5,6 +5,7 @@
   <title>Margin settings</title>
   <link rel="stylesheet" href="options.css">
   <script type="module" src="options.js"></script>
+  <script type="module" src="dictation/settings.js"></script>
 </head>
 <body><main>
 <h1>Margin settings</h1>
@@ -22,6 +23,18 @@
 <fieldset><legend>Tools</legend><label><input type="checkbox" id="ask"> Ask the reader</label><label><input type="checkbox" id="notes"> Read and write notes for this page</label><label><input type="checkbox" id="delegate"> Delegate reading tasks on this page</label></fieldset>
 <button type="submit">Save agent settings</button><output id="status" role="status"></output>
 </form></section>
+  <section class="section" aria-labelledby="dictation-title">
+    <h2 id="dictation-title">Dictation</h2>
+    <div class="section-body">
+      <label class="field">Spoken language<select id="dictation-language" disabled>
+        <option value="auto">Automatic (Mandarin and English)</option>
+        <option value="zh">Chinese (Mandarin)</option>
+        <option value="en">English</option>
+      </select></label>
+      <output id="dictation-status" role="status"></output>
+    </div>
+  </section>
+
 <section><h2>Local files</h2><p id="file-access"></p>
 <button id="details">Open extension details</button></section>
 </main></body></html>
