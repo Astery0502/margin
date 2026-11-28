@@ -1,9 +1,6 @@
 import { readerUrl, documentUrlForReader } from './urls.js';
-import { pdfCacheName } from './lifecycle.js';
+import { readerCache } from './lifecycle.js';
 import { activateTab, waitForTab } from '../tabs.js';
-
-let lifecycle;
-export function configurePdfRetention(retention) { lifecycle = retention; }
 
 async function readerTab(url) {
   const canonical = new URL(url); canonical.hash = '';
@@ -26,6 +23,7 @@ export async function pdfSourceAction(action, session) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
+  await chrome.storage.local.remove(['sourceViews', 'closedSourceDocuments', 'pdfReaders', 'closedPdfDocuments']);
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({ id: 'pi-discuss-selection', title: 'Discuss selected text with Pi', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'pi-open-pdf', title: 'Open PDF in Margin', contexts: ['page', 'link'] });
@@ -43,6 +41,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type !== 'pi-pdf-cache') return;
   if (!sender.tab || sender.frameId !== 0 || !documentUrlForReader(sender.url)) { respond({ error: 'PDF cache is available only to the Margin reader.' }); return; }
-  lifecycle.register(sender.tab.id, sender.url).then(() => respond({ name: pdfCacheName(sender.tab.id) }), error => respond({ error: error.message }));
+  readerCache(sender.tab.id, sender.url).then(name => respond({ name }), error => respond({ error: error.message }));
   return true;
 });

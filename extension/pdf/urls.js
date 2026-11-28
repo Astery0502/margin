@@ -19,6 +19,10 @@ export function documentUrlForReader(url) {
   return sourceUrl(target.searchParams.get('url'));
 }
 
+export function tabSource(tab) {
+  return documentUrlForReader(tab?.url) || sourceUrl(tab?.url);
+}
+
 // Cache Storage accepts HTTP keys only; document identity remains the original URL.
 export function pdfCacheUrl(url) {
   return url.startsWith('file:') ? `https://pi.invalid/local-pdf?url=${encodeURIComponent(url)}` : url;

@@ -1,8 +1,8 @@
 import { nativeHost, nativeCommand } from './providers/native.js';
 import { directories, accountGeneration } from './providers/grant.js';
 import { voice, discardVoice, transferVoice, microphoneTabClosed } from './dictation/background.js';
-import { configurePdfRetention, pdfSourceAction } from './pdf/background.js';
-import { sourceUrl, documentUrlForReader } from './pdf/urls.js';
+import { pdfSourceAction } from './pdf/background.js';
+import { sourceUrl, tabSource } from './pdf/urls.js';
 import * as store from './discussions/store.js';
 import { activateTab } from './tabs.js';
 import { hasTaskHost, taskCommand } from './agents/runtime.js';
@@ -14,14 +14,13 @@ const ports = new Set();
 // Native side panels may have no Chrome documentId. The isolated client supplies a per-view ID.
 const viewOwner = (sender, viewId) => sender.documentId || (isPanel(sender) && /^[a-f0-9]{32}$/.test(viewId) ? 'panel/' + viewId : null);
 const isPanel = sender => sender.url === chrome.runtime.getURL('sidepanel.html');
-const senderSource = sender => documentUrlForReader(sender.url) || sourceUrl(sender.url);
 
 let nextCapture = 0;
 let captureQueue = Promise.resolve();
 function notify(event) {
   for (const port of ports) {
     if (event.owner && event.owner !== viewOwner(port.sender, port.name.slice(11))) continue;
-    if (event.type !== 'account-changed' && !isPanel(port.sender) && senderSource(port.sender) !== event.sourceId) continue;
+    if (event.type !== 'account-changed' && !isPanel(port.sender) && tabSource(port.sender) !== event.sourceId) continue;
     try { port.postMessage(event); }
     catch (error) {
       // One failed delivery must not prevent the remaining views from receiving the event.
@@ -37,17 +36,13 @@ async function recoverTasks() {
 }
 const resumed = hasTaskHost().then(exists => exists || recoverTasks());
 
-const retention = sourceLifecycle({
-  listDocuments: store.sourceIds,
-  removeDocument: async sourceId => {
-    await taskCommand({ action: 'closeSource', sourceId }, { start: false });
-    await discardVoice(sourceId);
-    const result = await store.remove({ sourceId, wholePage: true, closing: true });
-    await forget(result.groups.get(sourceId) || [], sourceId);
-    notify({ type: 'source-closed', sourceId });
-  },
+const retention = sourceLifecycle(async sourceId => {
+  await taskCommand({ action: 'closeSource', sourceId }, { start: false });
+  await discardVoice(sourceId);
+  const result = await store.remove({ sourceId, wholePage: true, closing: true });
+  await forget(result.groups.get(sourceId) || [], sourceId);
+  notify({ type: 'source-closed', sourceId });
 });
-configurePdfRetention(retention);
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 function capture(tab) {
@@ -88,7 +83,7 @@ async function handle(action, values, sender, owner) {
     await opening;
     if (values.sessionId) {
       const session = await store.get(values.sessionId);
-      if (session.sourceId !== senderSource(sender)) throw new Error('The source page has changed.');
+      if (session.sourceId !== tabSource(sender)) throw new Error('The source page has changed.');
       await chrome.storage.session.set({ activeId: session.id, relatedId: null, panelInput: { sessionId: session.id, input: values.input, fromOwner: owner } });
       notify({ type: 'panel-session', sessionId: session.id });
     }
@@ -97,7 +92,7 @@ async function handle(action, values, sender, owner) {
   await resumed;
   await storageReady;
   if (['browse', 'matchingDiscussionIds', 'snapshot', 'activate', 'panelInput', 'storage', 'archivePage', 'clearPageFiles', 'deleteDiscussions', 'deletePage', 'exportPage'].includes(action) && !isPanel(sender)) throw new Error('Open the side panel to browse discussions.');
-  const sourceId = senderSource(sender);
+  const sourceId = tabSource(sender);
   if (['list', 'prepareDiscussion'].includes(action) && (!sourceId || sourceId !== (values.sourceId || values.source?.id))) throw new Error('The source page has changed.');
   if (['storage', 'archivePage', 'clearPageFiles', 'exportPage', 'deletePage'].includes(action) && !sourceUrl(values.sourceId)) throw new Error('Choose a source page first.');
   if (action === 'detail') {
@@ -110,7 +105,6 @@ async function handle(action, values, sender, owner) {
   switch (action) {
     case 'modelPreview': return modelOptions('preview');
     case 'identifier': return crypto.randomUUID();
-    case 'sourceView': return retention.register(sender.tab.id, sender.url);
     case 'list': return store.list(sourceId);
     case 'prepareDiscussion': return store.prepareDiscussion(values.source);
     case 'get': return session;
@@ -173,8 +167,11 @@ async function handle(action, values, sender, owner) {
       return retention.perform(sourceId, async () => {
         const settings = await executionSettings(values);
         const tab = await chrome.tabs.get(sender.tab.id);
-        if (!sourceId || values.source?.id !== sourceId || sourceUrl(values.source.url) !== sourceId || sourceId !== senderSource({ url: tab.url }) || !retention.owns(tab.id, sourceId)) throw new Error('Open the source page to start a discussion.');
-        return store.createDiscussion({ ...values, settings });
+        if (!sourceId || values.source?.id !== sourceId || sourceUrl(values.source.url) !== sourceId || sourceId !== tabSource(tab)) throw new Error('Open the source page to start a discussion.');
+        const discussion = await store.createDiscussion({ ...values, settings }, tab.id);
+        // A close between validation and commit may have seen no owner yet.
+        if (!await chrome.tabs.get(tab.id).catch(() => null)) retention.closed(tab.id).catch(console.error);
+        return discussion;
       });
     case 'send': {
       const generation = await accountGeneration(session.model.id, session.model.provider);
@@ -231,7 +228,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type === 'pi-dictation') {
     const dispatch = async () => {
       const { sessionId, action } = message;
-      const sourceId = isPanel(sender) && sessionId ? (await store.get(sessionId)).sourceId : senderSource(sender);
+      const sourceId = isPanel(sender) && sessionId ? (await store.get(sessionId)).sourceId : tabSource(sender);
       return voice(action, sessionId, sourceId, sender, message.recordingId, notify, viewOwner(sender, message.viewId));
     };
     dispatch().then(result => respond({ result }), error => respond({ error: error.message }));

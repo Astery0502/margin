@@ -1,25 +1,51 @@
-import { pdfCacheUrl } from './urls.js';
+import { documentUrlForReader, pdfCacheUrl } from './urls.js';
 
-export const pdfCacheName = tabId => `pi-pdf-reader-${tabId}`;
-export const clearPdfCache = tabId => caches.delete(pdfCacheName(tabId));
+const pdfCacheName = tabId => `pi-pdf-reader-${tabId}`;
+const readers = new Map();
+let maintenance = initialize();
 
-export async function reconcilePdfCaches(views, pending) {
-  const readers = Object.fromEntries(Object.entries(views).filter(([, view]) => view.kind === 'pdf').map(([id, view]) => [id, view.sourceId]));
-  const keep = new Set(Object.keys(readers).map(pdfCacheName));
+async function initialize() {
+  for (const tab of await chrome.tabs.query({ url: chrome.runtime.getURL('pdf/reader.html') + '*' })) {
+    const url = documentUrlForReader(tab.url);
+    if (url) readers.set(tab.id, url);
+  }
+  const keep = new Set([...readers.keys()].map(pdfCacheName));
   for (const name of await caches.keys()) {
     if (!name.startsWith('pi-pdf-')) continue;
     const previous = await caches.open(name);
     for (const request of await previous.keys()) {
-      for (const [id, url] of Object.entries(readers)) {
-        if (request.url !== pdfCacheUrl(url) || pending.has(url) || name === pdfCacheName(id)) continue;
+      for (const [id, url] of readers) {
+        if (request.url !== pdfCacheUrl(url) || name === pdfCacheName(id)) continue;
         const current = await caches.open(pdfCacheName(id));
         if (!await current.match(request)) await current.put(request, await previous.match(request));
       }
     }
     if (!keep.has(name)) await caches.delete(name);
     else {
-      const url = readers[name.slice('pi-pdf-reader-'.length)];
-      for (const request of await previous.keys()) if (request.url !== pdfCacheUrl(url) || pending.has(url)) await previous.delete(request);
+      const url = readers.get(Number(name.slice('pi-pdf-reader-'.length)));
+      for (const request of await previous.keys()) if (request.url !== pdfCacheUrl(url)) await previous.delete(request);
     }
   }
+}
+
+function update(tabId, url) {
+  maintenance = maintenance.then(async () => {
+    const previous = readers.get(tabId) ?? null;
+    if (previous === url) return;
+    if (url) readers.set(tabId, url);
+    else readers.delete(tabId);
+    if (previous) await caches.delete(pdfCacheName(tabId));
+  }).catch(console.error);
+}
+
+chrome.tabs.onUpdated.addListener((id, change) => {
+  if (change.url) update(id, documentUrlForReader(change.url));
+});
+chrome.tabs.onRemoved.addListener(id => update(id, null));
+
+export async function readerCache(tabId, url) {
+  await maintenance;
+  const current = await chrome.tabs.get(tabId);
+  if (documentUrlForReader(current.url) !== documentUrlForReader(url)) throw new Error('The source page has changed.');
+  return pdfCacheName(tabId);
 }

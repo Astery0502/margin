@@ -1,8 +1,18 @@
 import { openDB } from 'idb';
 import { findPassage } from './passages.js';
 
-const database = openDB('margin', 1, {
-  upgrade(db) {
+const database = openDB('margin', 2, {
+  async upgrade(db, oldVersion, _, tx) {
+    const owners = db.createObjectStore('owners', { keyPath: 'sourceId' });
+    owners.createIndex('tab', 'tabId');
+    if (oldVersion === 1) {
+      for (const name of ['discussions', 'files']) {
+        for await (const cursor of tx.objectStore(name).index('source').iterate(null, 'nextunique')) {
+          await owners.put({ sourceId: cursor.key, tabId: -1 });
+        }
+      }
+      return;
+    }
     for (const name of ['discussions', 'executions', 'snapshots']) {
       const store = db.createObjectStore(name, { keyPath: 'id' });
       store.createIndex('source', 'sourceId');
@@ -51,10 +61,10 @@ export async function prepareDiscussion(source) {
   return { document: { id: current.run.id }, discussion: item && summary(item, current.run) };
 }
 
-export async function createDiscussion({ source, includeFullText, text, settings }) {
+export async function createDiscussion({ source, includeFullText, text, settings }, tabId) {
   const { id: sourceId, selection, location } = source;
   if (!selection?.trim() || !location || !sourceId) throw new Error('Select a passage before sending.');
-  const tx = (await database).transaction(['discussions', 'executions', 'snapshots'], 'readwrite');
+  const tx = (await database).transaction(['discussions', 'executions', 'snapshots', 'owners'], 'readwrite');
   const current = includeFullText && await currentFull(tx, sourceId);
   const existing = current && match(current.items, source);
   if (existing) return summary(existing, current.run);
@@ -75,6 +85,8 @@ export async function createDiscussion({ source, includeFullText, text, settings
   }
   const item = { id, sourceId, executionId: run.id, source: { ...source, includeFullText }, createdAt: now, title: selection.slice(0, 48), archived: false };
   await tx.objectStore('discussions').add(item);
+  const owners = tx.objectStore('owners');
+  if (!await owners.getKey(sourceId)) await owners.add({ sourceId, tabId });
   await tx.done;
   return summary(item, run);
 }
@@ -176,13 +188,21 @@ export async function archivePage(sourceId, archived) {
   await tx.done;
 }
 
-export async function sourceIds() {
+export async function documentOwners(tabId) {
   const db = await database;
-  const ids = new Set();
-  for (const name of ['discussions', 'files']) {
-    for await (const cursor of db.transaction(name).store.index('source').iterate(null, 'nextunique')) ids.add(cursor.key);
-  }
-  return [...ids];
+  return tabId === undefined ? db.getAll('owners') : db.getAllFromIndex('owners', 'tab', tabId);
+}
+
+export async function documentOwner(sourceId) {
+  return (await database).get('owners', sourceId);
+}
+
+export async function transferDocument(sourceId, previous, tabId) {
+  const tx = (await database).transaction('owners', 'readwrite');
+  if ((await tx.store.get(sourceId))?.tabId !== previous) return false;
+  await tx.store.put({ sourceId, tabId });
+  await tx.done;
+  return true;
 }
 
 async function deleteByIndex(store, index, value) {
@@ -191,7 +211,7 @@ async function deleteByIndex(store, index, value) {
 
 export async function remove({ sourceId, sessionIds, wholePage, closing, ...filter }) {
   if (wholePage && !sourceId) throw new Error('Choose a source page first.');
-  const tx = (await database).transaction(stores, 'readwrite');
+  const tx = (await database).transaction([...stores, 'owners'], 'readwrite');
   const discussions = tx.objectStore('discussions');
   let items = await readBySource(discussions, sourceId);
   const selected = sessionIds && new Set(sessionIds);
@@ -207,6 +227,9 @@ export async function remove({ sourceId, sessionIds, wholePage, closing, ...filt
     if (run.snapshotId && !(await executions.index('source').getAll(run.sourceId)).some(other => other.snapshotId === run.snapshotId)) await tx.objectStore('snapshots').delete(run.snapshotId);
   }
   if (wholePage) await deleteByIndex(tx.objectStore('files'), 'source', sourceId);
+  for (const id of wholePage ? [sourceId] : new Set(items.map(item => item.sourceId))) {
+    if (wholePage || (!await discussions.index('source').count(id) && !await tx.objectStore('files').index('source').count(id))) await tx.objectStore('owners').delete(id);
+  }
   await tx.done;
   const groups = new Map();
   for (const item of items) {
@@ -217,9 +240,10 @@ export async function remove({ sourceId, sessionIds, wholePage, closing, ...filt
 }
 
 export async function clearFiles(sourceId) {
-  const tx = (await database).transaction(['files', 'executions'], 'readwrite');
+  const tx = (await database).transaction(['files', 'executions', 'discussions', 'owners'], 'readwrite');
   if ((await tx.objectStore('executions').index('source').getAll(sourceId)).some(run => run.status === 'running')) throw new Error('Stop active tasks before clearing files.');
   await deleteByIndex(tx.objectStore('files'), 'source', sourceId);
+  if (!await tx.objectStore('discussions').index('source').count(sourceId)) await tx.objectStore('owners').delete(sourceId);
   await tx.done;
 }
 

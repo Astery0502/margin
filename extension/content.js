@@ -2,8 +2,6 @@
   if (document.contentType === 'application/pdf') return;
   const request = PiBrowser.request;
   const id = new URL(location.href); id.hash = '';
-  const registered = request('sourceView');
-  registered.catch(console.error);
   let selected = null;
   let loadVersion = 0;
   const { quickIcon, fullIcon } = passageActions;
@@ -204,8 +202,6 @@
   });
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type !== 'pi-source-content') return;
-    if (message.action === 'identity') { const current = new URL(location.href); current.hash = ''; respond({ sourceId: current.href }); return; }
-    if (message.action === 'navigation') { navigate(); respond({ updated: true }); return; }
     if (message.action === 'selection') {
       const open = async () => {
         selected = PiSourceAnchors.selectionRange()?.cloneRange();
@@ -228,5 +224,6 @@
   window.addEventListener('pagehide', event => {
     if (!event.persisted) { discussions.dispose(); unsubscribe(); if (layoutFrame !== null) cancelAnimationFrame(layoutFrame); }
   });
-  registered.then(loadPage).catch(error => status(error.message));
+  navigation.addEventListener('currententrychange', navigate);
+  loadPage();
 })();

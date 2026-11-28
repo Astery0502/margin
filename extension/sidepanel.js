@@ -1,4 +1,4 @@
-import { documentUrlForReader, sourceUrl } from './pdf/urls.js';
+import { tabSource } from './pdf/urls.js';
 import { bindIconHints } from './sidepanel/icon-hints.js';
 import { discussionDirectory } from './sidepanel/directory.js';
 
@@ -119,7 +119,7 @@ async function load() {
 
 async function currentPage() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const id = documentUrlForReader(tab?.url) || sourceUrl(tab?.url);
+  const id = tabSource(tab);
   const changed = context.pageId !== id;
   const title = tab?.title || (id && new URL(id).hostname) || '';
   const renamed = context.pageTitle !== title;

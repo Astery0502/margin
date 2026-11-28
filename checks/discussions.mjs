@@ -1,5 +1,5 @@
 import { launchTestExtension } from './fixtures/native-extension.mjs';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, writeFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer } from 'node:http';
@@ -25,6 +25,10 @@ try {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
   await cp('dist', extension, { recursive: true });
+  const content = join(extension, 'content.js');
+  await writeFile(content, `if (location.pathname === '/unresponsive') {
+    chrome.runtime.onMessage.addListener(message => message.action === 'identity' ? true : undefined);
+  } else {${await readFile(content, 'utf8')} }`);
   await build({ entryPoints: ['extension/agents/worker.js', 'extension/background.js'], outbase: 'extension', outdir: extension, bundle: true, platform: 'browser', format: 'esm',
     plugins: [{ name: 'controlled-replies', setup(build) {
       build.onResolve({ filter: /providers\/stream\.js$/ }, () => ({ path: resolve('checks/fixtures/stream.js') }));
@@ -261,6 +265,8 @@ try {
   await expect(panel.getByRole('textbox', { name: 'Discussion draft' })).toHaveValue('Keep this handoff draft');
   await expect.poll(async () => (await rpc('detail', { sessionId: first })).queuedMessages?.followUp).toEqual(['Please queue the next question']);
   await expect.poll(() => versionId).toBeTruthy();
+  const unresponsive = await context.newPage();
+  await unresponsive.goto(origin + '/unresponsive');
   await cdp.send('ServiceWorker.stopWorker', { versionId });
   await expect.poll(async () => (await rpc('get', { sessionId: first })).status).toBe('running');
   await expect(panel.getByRole('button', { name: 'Stop task' })).toBeEnabled();
@@ -323,6 +329,7 @@ try {
   await panel.getByRole('button', { name: 'Archive', exact: true }).click();
   const hint = panel.locator('#icon-hint');
   const restore = panel.getByRole('button', { name: 'Restore', exact: true });
+  await panelDraft.hover();
   await restore.hover();
   await expect(hint).toBeVisible();
   await expect(hint).toHaveText('Restore');
@@ -384,10 +391,18 @@ try {
   await page.goto(page.url() + '#passage');
   await page.reload();
   await expect.poll(async () => (await listed()).length).toBe(2);
+  await page.goto(origin + '/second');
+  await compose(0, 'Quick', 'Discuss the second article');
+  await expect.poll(async () => (await listed()).length).toBe(3);
+  await page.goBack();
+  await expect(page.getByRole('button', { name: /2 saved discussions on this page/ })).toBeVisible();
+  await page.goto(origin + '/second');
   await page.close();
-  await expect.poll(async () => (await listed()).length).toBe(0);
+  await expect.poll(async () => (await listed()).map(item => item.sourceId)).toEqual([twin.url(), twin.url()]);
   assert.equal(JSON.parse(await readFile(exportedFile, 'utf8')).discussions.length, 2);
   await twin.close();
+  await expect.poll(async () => (await listed()).length).toBe(0);
+  await unresponsive.close();
   // Use the same controlled runtime through the PDF reader and native side panel.
   modelIds = ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-6.1-sol', 'gpt-4o-mini'];
   await expireListing();
